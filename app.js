@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.3.0-M2 b001
+/* JPS app.js — BUILD JPS v0.3.0-M2 b002
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.3.0-M2 b001';
+var BUILD = 'JPS v0.3.0-M2 b002';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', pic:'🐄' }, { v:'buffalo', te:'గేదె', en:'Buffalo', pic:'🐃' },
@@ -32,7 +32,8 @@ var EVENT_TE = { CREATED:'అభ్యర్థన నమోదైంది · F
   CALL_LOGGED:'డాక్టర్ కాల్ చేశారు · Doctor called', ADVICE_CLOSED:'సలహాతో పరిష్కారం · Resolved with advice',
   VISIT_SCHEDULED:'సందర్శన ఖరారు · Visit scheduled', VISIT_DONE:'సందర్శన పూర్తి · Visit completed',
   ESCALATED_1962:'1962/MVCకి పంపారు · Escalated', CANCELLED:'రద్దు · Cancelled',
-  PRESCRIPTION:'మందుల చీటీ · Prescription' };
+  PRESCRIPTION:'మందుల చీటీ · Prescription', VIDEO_CALL:'వీడియో కాల్ · Video call' };
+var JITSI = 'https://meet.jit.si/';
 var SLOTS = [
   { v:'morning', te:'ఉదయం', en:'Morning' },
   { v:'afternoon', te:'మధ్యాహ్నం', en:'Afternoon' },
@@ -375,13 +376,18 @@ function vTicket(ticket) {
         '<img class="ph" src="data:' + esc(p.photo.mime) + ';base64,' + p.photo.b64 + '"></div>';
     }).join('');
     var svcLine = r.service ? '<p>' + esc(T(r.service.te, r.service.en)) + ' <span class="hint">(' + esc(r.service.code) + ')</span></p>' : '';
+    var caseOpen = r.status === 'ASSIGNED' || r.status === 'VISIT_SCHEDULED';
+    var video = (caseOpen && r.video_room)
+      ? '<a class="btn green" target="_blank" rel="noopener" href="' + JITSI + esc(r.video_room) + '">🎥 ' +
+        esc(T('వీడియో కాల్‌లో చేరండి', 'Join video call')) + '</a><div style="height:8px"></div>' : '';
     var actions = '';
     if (staff && (r.status === 'NEW' || r.status === 'ASSIGNED' || r.status === 'VISIT_SCHEDULED')) {
       var slotOpts = SLOTS.map(function (s) { return '<option value="' + s.te + ' · ' + s.en + '">' + s.te + ' · ' + s.en + '</option>'; }).join('');
       actions = '<div class="card" id="acts">' +
         (r.status === 'NEW'
           ? '<button class="btn" id="claim">Claim this case</button>'
-          : '<div class="rowline"><a class="btn small" href="tel:' + esc(r.farmer.phone) + '">📞 Call farmer</a></div>' +
+          : '<div class="rowline"><a class="btn small" href="tel:' + esc(r.farmer.phone) + '">📞 Call farmer</a>' +
+            '<button class="btn small green" id="vidbtn">🎥 ' + (r.video_room ? 'Video call link' : 'Start video call') + '</button></div>' +
             '<label>Notes</label><textarea id="note" maxlength="1000"></textarea>' +
             '<label>Prescription photo (optional — sent with any action)</label>' +
             '<input id="rxf" type="file" accept="image/*" capture="environment">' +
@@ -406,7 +412,7 @@ function vTicket(ticket) {
       '<p class="hint">' + esc(r.gp ? r.gp + ', ' : '') + esc(r.village) + ', ' + esc(r.mandal) + '</p>' +
       (r.description ? '<p>' + esc(r.description) + '</p>' : '') +
       (r.pashu_tag ? '<p class="hint">Ear tag: ' + esc(r.pashu_tag) + '</p>' : '') +
-      visit + farmer + farmLoc + vet + photo + '</div>' +
+      visit + farmer + farmLoc + vet + photo + '</div>' + video +
       (!staff ? facilityCard(r.facility, T('మీ పశు వైద్య కేంద్రం', 'Your veterinary centre')) : '') +
       rx + actions +
       '<div class="card"><h2>' + TL('పురోగతి', 'Progress') + '</h2><ul class="rail">' + events + '</ul></div>' +
@@ -415,6 +421,13 @@ function vTicket(ticket) {
       if (el('claim')) el('claim').onclick = function () {
         api('vet.claim', { id: r.id }).then(function () { vTicket(ticket); })
           .catch(function (e) { alert(e.message); vTicket(ticket); });
+      };
+      if (el('vidbtn')) el('vidbtn').onclick = function () {
+        el('vidbtn').disabled = true;
+        api('vet.videoStart', { id: r.id }).then(function (d) {
+          window.open(JITSI + d.room, '_blank');
+          vTicket(ticket);
+        }).catch(function (e) { el('vidbtn').disabled = false; alert(e.message); });
       };
       Array.prototype.forEach.call(document.querySelectorAll('#acts [data-a]'), function (b) {
         b.onclick = function () {
