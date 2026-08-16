@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.3.0-M2 b003
+/* JPS app.js — BUILD JPS v0.3.0-M2 b004
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.3.0-M2 b003';
+var BUILD = 'JPS v0.3.0-M2 b004';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', pic:'🐄' }, { v:'buffalo', te:'గేదె', en:'Buffalo', pic:'🐃' },
@@ -379,7 +379,11 @@ function vTicket(ticket) {
     var caseOpen = r.status === 'ASSIGNED' || r.status === 'VISIT_SCHEDULED';
     var video = (caseOpen && r.video_room)
       ? '<a class="btn green" target="_blank" rel="noopener" href="' + JITSI + esc(r.video_room) + '">🎥 ' +
-        esc(T('వీడియో కాల్‌లో చేరండి', 'Join video call')) + '</a><div style="height:8px"></div>' : '';
+        esc(T('వీడియో కాల్‌లో చేరండి', 'Join video call')) + '</a>' +
+        (staff ? '' : '<p class="hint" style="text-align:center;margin-top:6px">' +
+          esc(T('డాక్టర్ చేరగానే కాల్ మొదలవుతుంది — మీకు ఎలాంటి ఖాతా అవసరం లేదు',
+                'The call starts when the doctor joins — you never need an account')) + '</p>') +
+        '<div style="height:8px"></div>' : '';
     var actions = '';
     if (staff && (r.status === 'NEW' || r.status === 'ASSIGNED' || r.status === 'VISIT_SCHEDULED')) {
       var slotOpts = SLOTS.map(function (s) { return '<option value="' + s.te + ' · ' + s.en + '">' + s.te + ' · ' + s.en + '</option>'; }).join('');
@@ -388,6 +392,7 @@ function vTicket(ticket) {
           ? '<button class="btn" id="claim">Claim this case</button>'
           : '<div class="rowline"><a class="btn small" href="tel:' + esc(r.farmer.phone) + '">📞 Call farmer</a>' +
             '<button class="btn small green" id="vidbtn">🎥 ' + (r.video_room ? 'Video call link' : 'Start video call') + '</button></div>' +
+            '<p class="hint">First video call on this phone: Jitsi asks the host to sign in — use your own Gmail, one time only. Farmers never need an account.</p>' +
             '<label>Notes</label><textarea id="note" maxlength="1000"></textarea>' +
             '<label>Prescription photo (optional — sent with any action)</label>' +
             '<input id="rxf" type="file" accept="image/*" capture="environment">' +

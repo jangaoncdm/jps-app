@@ -1,8 +1,8 @@
-/* JPS service worker — BUILD JPS v0.3.0-M2 b003
+/* JPS service worker — BUILD JPS v0.3.0-M2 b004
  * Network-first so a new deploy always wins when online; cached shell keeps the
  * app opening offline in poor-network villages. API POSTs are never cached.
  */
-var CACHE = 'JPS v0.3.0-M2 b003'; // full build tag — bump-build.sh rewrites it, busting old caches
+var CACHE = 'JPS v0.3.0-M2 b004'; // full build tag — bump-build.sh rewrites it, busting old caches
 var SHELL = ['./', './index.html', './app.js', './manifest.webmanifest', './icon-192.png'];
 
 self.addEventListener('install', function (e) {
