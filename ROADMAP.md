@@ -31,16 +31,17 @@ Goal: no manual editor steps ever again; clean data; first real users.
 - [ ] Pilot rollout: WhatsApp the app link to field officers of 1–2 mandals; collect feedback weekly
 Definition of Done: one command deploys backend + client; live suite green; zero test rows; ≥1 mandal using it.
 
-## Phase C — Internal staff modules (v0.4) ⏭ next
-Goal: the app becomes the department's daily tool.
-- On-call/off-call availability toggle per vet + admin block/unblock UI
-- Duty roster (F9) — month view, per-facility; drives who gets new-case visibility first
-- Attendance & leave: check-in/out per staff, leave requests + admin approval
-- Medicine stock (F8): per-facility stock, issue against cases, reorder alerts
-- Broadcasts: admin publishes public-interest notices → farmer home page + push later
-- Staff support tickets (raise issue for help/support)
-**Data prerequisites (owner)**: fix F8 columns (shifted one left, no facility codes, no units);
-fill F9 Month values; both re-imported via `xlsx-to-seed.py`.
+## Phase C — Internal staff modules (v0.4.0-M3 b001) ✅ done (19 live checks)
+The app is now the department's daily tool. Shipped 2026-08-16:
+- [x] On-call/off-call toggle per vet (visible on admin dashboard + vet console)
+- [x] Attendance: check-in/out with double-entry guard, recent-records view
+- [x] Leave: staff request → admin approve/reject, date validation
+- [x] Medicine stock: per-facility quantities + reorder alerts, 129-item catalogue seeded from F8
+      (live quantities entered in-app by the stores wing — sidesteps the broken F8 qty columns)
+- [x] Broadcasts: admin publishes notices → every farmer's home screen; end anytime
+- [x] Staff support tickets: raise → admin responds and closes
+Not built (deliberately): F9 month-view roster — availability + attendance + leave cover on-duty
+tracking; revisit only if the DV&AHO asks for a printed monthly roster.
 
 ## Phase D — Reach & notifications (v0.5) ⏳ later
 - FCM push notifications (needs district Firebase project + `google-services.json`)
