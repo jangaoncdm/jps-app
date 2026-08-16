@@ -1,0 +1,17 @@
+{
+  "name": "జనగామ పశు సేవ — Jangaon Pashu Seva",
+  "short_name": "పశు సేవ",
+  "description": "Veterinary doctor-on-call for Jangaon District — a government vet calls you back.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FAF9F6",
+  "theme_color": "#312E81",
+  "lang": "te",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

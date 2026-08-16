@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="te">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>జనగామ పశు సేవ — Jangaon Pashu Seva</title>
+<meta name="theme-color" content="#312E81">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{--brand:#3730A3;--brand-deep:#312E81;--brand-ink:#1E1B4B;--brand-soft:#EEF0FB;
+--accent:#B45309;--accent-soft:#FDF3E3;--red:#B91C1C;--red-soft:#FBEAEA;
+--paper:#FAF9F6;--card:#FFFFFF;--ink:#232136;--muted:#6E6C85;--line:#E5E4EF;
+--ok:#15803D;--ok-soft:#EAF5EC;--radius:16px;--shadow:0 1px 3px rgba(30,27,75,.07),0 4px 14px rgba(30,27,75,.05)}
+*{box-sizing:border-box;margin:0}
+body{font-family:"Noto Sans Telugu","Noto Sans",system-ui,-apple-system,sans-serif;background:var(--paper);
+color:var(--ink);font-size:17px;line-height:1.55;-webkit-text-size-adjust:100%;
+padding-top:env(safe-area-inset-top)}
+a{color:var(--brand)}
+header.top{background:linear-gradient(135deg,var(--brand-ink),var(--brand));color:#fff;
+padding:14px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:5}
+header.top .t{font-weight:700;font-size:18px;letter-spacing:.2px} header.top .s{font-size:12px;opacity:.8}
+header.top .sp{flex:1}
+header.top button{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.35);color:#fff;
+border-radius:999px;padding:6px 12px;font-size:13px;font-family:inherit;font-weight:600;cursor:pointer}
+.wrap{max-width:680px;margin:0 auto;padding:16px 14px 80px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+padding:18px;margin:14px 0;box-shadow:var(--shadow)}
+h1{font-size:22px;margin-bottom:6px;letter-spacing:-.2px} h2{font-size:17px;margin:14px 0 8px}
+.hint{color:var(--muted);font-size:14px}
+label{display:block;font-weight:600;margin:14px 0 6px} label .en,.en{font-weight:400;color:var(--muted);font-size:13px}
+input,select,textarea{width:100%;padding:13px;font-size:17px;border:1.5px solid var(--line);border-radius:12px;
+background:#fff;font-family:inherit;color:var(--ink)}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--brand);border-color:var(--brand)}
+textarea{min-height:84px}
+.btn{display:block;width:100%;padding:15px;font-size:17px;font-weight:700;text-align:center;background:var(--brand);
+color:#fff;border:none;border-radius:14px;font-family:inherit;text-decoration:none;cursor:pointer;
+box-shadow:0 2px 6px rgba(49,46,129,.25)}
+.btn:active{transform:translateY(1px)}
+.btn.small{display:inline-block;width:auto;padding:9px 14px;font-size:15px;box-shadow:none}
+.btn.amber{background:var(--accent)} .btn.red{background:var(--red)} .btn.green{background:var(--ok)}
+.btn.ghost{background:#fff;color:var(--brand);border:1.5px solid var(--brand);box-shadow:none}
+.btn[disabled]{opacity:.5}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{position:relative;border:1.5px solid var(--line);border-radius:14px;background:#fff;padding:12px 8px;
+text-align:center;font-size:16px;cursor:pointer}
+.tile .pic{font-size:32px;display:block} .tile .en{display:block}
+.tile input{position:absolute;opacity:0;inset:0}
+.tile.on{border-color:var(--brand);background:var(--brand-soft);outline:2px solid var(--brand)}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{border:1.5px solid var(--line);background:#fff;border-radius:999px;padding:8px 16px;
+font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;color:var(--ink)}
+.chip.on{border-color:var(--brand);background:var(--brand-soft);color:var(--brand)}
+.token{background:linear-gradient(135deg,var(--brand-ink),var(--brand));color:#fff;border-radius:var(--radius);
+padding:20px;text-align:center;box-shadow:var(--shadow)}
+.token .no{font-size:30px;font-weight:800;letter-spacing:1.5px}
+.token .lbl{font-size:13px;opacity:.8}
+.badge{display:inline-block;padding:4px 12px;border-radius:999px;font-weight:700;font-size:13.5px}
+.b-NEW{background:var(--accent-soft);color:var(--accent)}
+.b-ASSIGNED{background:var(--brand-soft);color:var(--brand)}
+.b-VISIT_SCHEDULED{background:var(--accent-soft);color:var(--accent)}
+.b-RESOLVED{background:var(--ok-soft);color:var(--ok)}
+.b-ESCALATED{background:var(--red-soft);color:var(--red)}
+.b-CANCELLED{background:#EEEDF3;color:#5A5870}
+.rail{list-style:none;padding-left:22px;border-left:3px solid var(--line);margin:10px 0 0 8px}
+.rail li{position:relative;padding:0 0 16px 10px}
+.rail li::before{content:"";position:absolute;left:-31px;top:4px;width:13px;height:13px;border-radius:50%;
+background:var(--brand);border:3px solid var(--paper)}
+.rail .when{font-size:13px;color:var(--muted)}
+.emg{display:flex;gap:10px;align-items:center;background:var(--red-soft);border:1.5px solid var(--red);
+border-radius:14px;padding:12px}
+.emg input{width:24px;height:24px;accent-color:var(--red)}
+.fac{border:1.5px solid var(--brand);background:var(--brand-soft);border-radius:14px;padding:14px;margin:10px 0}
+.fac .nm{font-weight:700}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th,td{text-align:left;padding:9px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+tr.breach td{background:var(--red-soft)}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;box-shadow:var(--shadow)}
+.stat .n{font-size:26px;font-weight:800} .stat .l{font-size:13px;color:var(--muted)}
+.err{background:var(--red-soft);border:1.5px solid var(--red);color:var(--red);border-radius:12px;
+padding:10px 12px;margin:10px 0;font-weight:600}
+.ok{background:var(--ok-soft);border:1.5px solid var(--ok);color:var(--ok);border-radius:12px;
+padding:10px 12px;margin:10px 0;font-weight:600}
+.tabs{display:flex;gap:8px;margin:10px 0}
+.tabs button{flex:1;padding:10px;border:1.5px solid var(--line);background:#fff;border-radius:12px;
+font-family:inherit;font-size:15px;font-weight:600;cursor:pointer}
+.tabs button.on{border-color:var(--brand);background:var(--brand-soft);color:var(--brand)}
+.rowline{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}
+img.ph{max-width:100%;border-radius:12px;border:1px solid var(--line)}
+.tip{border-left:4px solid var(--brand);background:var(--card);border-radius:0 14px 14px 0;
+padding:12px 14px;margin:10px 0;border-top:1px solid var(--line);border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+.tip.warn{border-left-color:var(--red)}
+footer{color:var(--muted);font-size:12px;text-align:center;margin-top:24px}
+.spin{text-align:center;color:var(--muted);padding:26px 0}
+@media(min-width:560px){.tiles{grid-template-columns:repeat(4,1fr)}.stats{grid-template-columns:repeat(4,1fr)}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div><div class="t">జనగామ పశు సేవ</div><div class="s">Jangaon Pashu Seva · District Administration</div></div>
+  <div class="sp"></div>
+  <button id="langbtn" title="Language"></button>
+</header>
+<div class="wrap" id="view"><div class="spin">లోడ్ అవుతోంది…</div></div>
+<script src="app.js"></script>
+<script>
+if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
+  navigator.serviceWorker.register('sw.js');
+}
+</script>
+</body>
+</html>
