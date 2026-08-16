@@ -34,7 +34,8 @@ Definition of Done: one command deploys backend + client; live suite green; zero
 ## Phase C — Internal staff modules (v0.4.0-M3 b001) ✅ done (19 live checks)
 The app is now the department's daily tool. Shipped 2026-08-16:
 - [x] On-call/off-call toggle per vet (visible on admin dashboard + vet console)
-- [x] Attendance: check-in/out with double-entry guard, recent-records view
+- [x] Attendance: check-in/out with **mandatory camera photo + GPS geo-tag** (b002), double-entry
+      guard, map link + photo view on records (photos private, served via API only)
 - [x] Leave: staff request → admin approve/reject, date validation
 - [x] Medicine stock: per-facility quantities + reorder alerts, 129-item catalogue seeded from F8
       (live quantities entered in-app by the stores wing — sidesteps the broken F8 qty columns)
