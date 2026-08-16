@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.3.0-M2 b004
+/* JPS app.js — BUILD JPS v0.4.0-M3 b001
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.3.0-M2 b004';
+var BUILD = 'JPS v0.4.0-M3 b001';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', pic:'🐄' }, { v:'buffalo', te:'గేదె', en:'Buffalo', pic:'🐃' },
@@ -239,7 +239,16 @@ function identify(phone, name, source) {
 
 function vHome() {
   render('<div class="spin">' + esc(T('లోడ్ అవుతోంది…', 'Loading…')) + '</div>');
-  api('farmer.myRequests', {}).then(function (d) {
+  Promise.all([api('farmer.myRequests', {}), api('meta.broadcasts', {}).catch(function () { return { broadcasts: [] }; })])
+  .then(function (both) {
+    var d = both[0];
+    var notices = (both[1].broadcasts || []).map(function (b) {
+      return '<div class="tip"><b>' + esc(b.title) + '</b>' +
+        (b.body ? '<div>' + esc(b.body) + '</div>' : '') +
+        '<div class="hint">' + esc(String(b.at).slice(0, 10)) + '</div></div>';
+    }).join('');
+    var noticesCard = notices
+      ? '<div class="card"><h2>📢 ' + TL('ప్రకటనలు', 'Notices') + '</h2>' + notices + '</div>' : '';
     var rows = d.requests.map(function (r) {
       return '<tr><td><a href="#t/' + esc(r.ticket) + '"><b>' + esc(r.ticket) + '</b></a><br>' +
         '<span class="hint">' + esc(spLabel(r.species)) + '</span></td>' +
@@ -251,6 +260,7 @@ function vHome() {
       '<p class="hint">' + esc(T('అభ్యర్థన పంపండి — డాక్టర్ కాల్ చేస్తారు', 'File a request — a vet will call you back.')) + '</p><div style="height:10px"></div>' +
       '<a class="btn" href="#new">🩺 ' + esc(T('కొత్త అభ్యర్థన', 'New request')) + '</a><div style="height:8px"></div>' +
       '<a class="btn red" href="tel:1962">🚑 ' + esc(T('అత్యవసరం? 1962', 'Emergency? 1962')) + '</a></div>' +
+      noticesCard +
       '<div class="card"><h2>' + TL('నా అభ్యర్థనలు', 'My requests') + '</h2><table>' + rows + '</table></div>' +
       '<a class="btn ghost" href="#tips">📗 ' + esc(T('పశు సంరక్షణ సూచనలు', "Do's & don'ts for your animals")) + '</a>' +
       '<p style="text-align:center;margin-top:10px"><a href="#" id="lo" class="hint">' + esc(T('లాగ్ అవుట్', 'Logout')) + '</a></p>');
@@ -478,6 +488,193 @@ function vTips() {
     '<a class="btn ghost" href="#home">← ' + esc(T('హోమ్', 'Home')) + '</a>');
 }
 
+// ---------------------------------------------------------------- staff modules (v0.4, English-only)
+function staffNav(cur) {
+  var items = [['#vet', 'Queue'], ['#att', 'Attendance'], ['#leave', 'Leave'],
+               ['#stock', 'Stock'], ['#issues', 'Issues']];
+  if (S.user && S.user.role === 'admin') items.push(['#bcast', 'Broadcasts']);
+  return '<div class="tabs" style="flex-wrap:wrap">' + items.map(function (i) {
+    return '<button data-nav="' + i[0] + '" class="' + (cur === i[0] ? 'on' : '') + '">' + i[1] + '</button>';
+  }).join('') + '</div>';
+}
+function wireStaffNav() {
+  Array.prototype.forEach.call(document.querySelectorAll('[data-nav]'), function (b) {
+    b.onclick = function () { location.hash = b.getAttribute('data-nav'); };
+  });
+}
+
+function vAttend() {
+  render('<div class="spin">Loading…</div>');
+  api('staff.attendance', {}).then(function (d) {
+    var last = d.records[0];
+    var nextIn = !last || last.type === 'out';
+    var rows = d.records.map(function (r) {
+      return '<tr><td>' + (r.type === 'in' ? '✅ In' : '🏁 Out') + '</td><td>' + esc(r.at) + '</td></tr>';
+    }).join('') || '<tr><td colspan="2" class="hint">No records yet</td></tr>';
+    render('<h1>Attendance</h1>' + staffNav('#att') +
+      '<div class="card" style="text-align:center">' +
+      '<button class="btn ' + (nextIn ? 'green' : 'amber') + '" id="att">' +
+      (nextIn ? '✅ Check in' : '🏁 Check out') + '</button></div>' +
+      '<div class="card"><h2>My recent records</h2><table>' + rows + '</table></div>');
+    wireStaffNav();
+    el('att').onclick = function () {
+      el('att').disabled = true;
+      api('staff.attend', { type: nextIn ? 'in' : 'out' }).then(vAttend)
+        .catch(function (e) { alert(e.message); vAttend(); });
+    };
+  }).catch(function (e) { if (e.code === 'auth' || e.code === 'forbidden') return logout(); render('<div class="err">' + esc(e.message) + '</div>'); });
+}
+
+function vLeave() {
+  render('<div class="spin">Loading…</div>');
+  var isAdmin = S.user.role === 'admin';
+  Promise.all([api('staff.leaveList', {}), isAdmin ? api('staff.leaveList', { all: 1 }) : Promise.resolve(null)])
+  .then(function (res) {
+    var mine = res[0].leaves.map(function (l) {
+      return '<tr><td>' + esc(l.from_date) + ' → ' + esc(l.to_date) + '<br><span class="hint">' + esc(l.reason) + '</span></td>' +
+        '<td><span class="badge ' + (l.status === 'approved' ? 'b-RESOLVED' : l.status === 'rejected' ? 'b-ESCALATED' : 'b-NEW') + '">' + esc(l.status) + '</span></td></tr>';
+    }).join('') || '<tr><td colspan="2" class="hint">No leave requests</td></tr>';
+    var pendingAll = '';
+    if (isAdmin) {
+      var pend = res[1].leaves.filter(function (l) { return l.status === 'pending'; });
+      pendingAll = '<div class="card"><h2>Pending approvals (' + pend.length + ')</h2><table>' +
+        (pend.map(function (l) {
+          return '<tr><td><b>' + esc(l.name) + '</b><br>' + esc(l.from_date) + ' → ' + esc(l.to_date) +
+            '<br><span class="hint">' + esc(l.reason) + '</span></td>' +
+            '<td><div class="rowline"><button class="btn small green" data-lv="' + esc(l.id) + '" data-d="approved">Approve</button>' +
+            '<button class="btn small red" data-lv="' + esc(l.id) + '" data-d="rejected">Reject</button></div></td></tr>';
+        }).join('') || '<tr><td class="hint">Nothing pending</td></tr>') + '</table></div>';
+    }
+    render('<h1>Leave</h1>' + staffNav('#leave') +
+      '<div class="card"><h2>Request leave</h2><div id="msg"></div>' +
+      '<label>From</label><input id="lf" type="date">' +
+      '<label>To</label><input id="lt" type="date">' +
+      '<label>Reason</label><input id="lr" type="text" maxlength="300">' +
+      '<div style="height:10px"></div><button class="btn small" id="lgo">Submit request</button></div>' +
+      pendingAll +
+      '<div class="card"><h2>My requests</h2><table>' + mine + '</table></div>');
+    wireStaffNav();
+    el('lgo').onclick = function () {
+      api('staff.leaveRequest', { from_date: el('lf').value, to_date: el('lt').value, reason: el('lr').value })
+        .then(vLeave).catch(function (e) { el('msg').innerHTML = '<div class="err">' + esc(e.message) + '</div>'; });
+    };
+    Array.prototype.forEach.call(document.querySelectorAll('[data-lv]'), function (b) {
+      b.onclick = function () {
+        api('admin.leaveDecide', { id: b.getAttribute('data-lv'), decision: b.getAttribute('data-d') })
+          .then(vLeave).catch(function (e) { alert(e.message); });
+      };
+    });
+  }).catch(function (e) { if (e.code === 'auth' || e.code === 'forbidden') return logout(); render('<div class="err">' + esc(e.message) + '</div>'); });
+}
+
+function vStock() {
+  render('<div class="spin">Loading…</div>');
+  var fc = localStorage.getItem('jps_stock_fc') || 'AH-01';
+  loadMasters().then(function (M) {
+    return api('stock.list', { facility_code: fc }).then(function (d) {
+      var facOpts = M.facilities.map(function (f) {
+        return '<option value="' + esc(f.code) + '"' + (f.code === fc ? ' selected' : '') + '>' + esc(f.code) + ' — ' + esc(f.name) + '</option>';
+      }).join('');
+      var have = {};
+      var rows = d.stock.map(function (s) {
+        have[s.item_code] = 1;
+        return '<tr class="' + (s.low ? 'breach' : '') + '"><td>' + esc(s.item_name) +
+          (s.low ? ' <span class="badge b-ESCALATED">LOW</span>' : '') +
+          '<br><span class="hint">' + esc(s.item_code) + '</span></td>' +
+          '<td><input style="width:70px" type="number" min="0" id="q-' + esc(s.item_code) + '" value="' + s.qty + '"></td>' +
+          '<td><input style="width:70px" type="number" min="0" id="r-' + esc(s.item_code) + '" value="' + s.reorder_level + '"></td>' +
+          '<td><button class="btn small ghost" data-save="' + esc(s.item_code) + '">Save</button></td></tr>';
+      }).join('') || '<tr><td colspan="4" class="hint">No items tracked here yet — add one below</td></tr>';
+      var addOpts = M.stockItems.filter(function (i) { return !have[i.code]; }).map(function (i) {
+        return '<option value="' + esc(i.code) + '">' + esc(i.name) + '</option>';
+      }).join('');
+      render('<h1>Medicine stock</h1>' + staffNav('#stock') +
+        '<div class="card"><label>Facility</label><select id="fc">' + facOpts + '</select>' +
+        '<table style="margin-top:10px"><tr><th>Item</th><th>Qty</th><th>Reorder at</th><th></th></tr>' + rows + '</table>' +
+        '<h2>Track new item</h2><select id="ni">' + addOpts + '</select>' +
+        '<div class="rowline"><input style="width:90px" type="number" min="0" id="nq" placeholder="Qty">' +
+        '<input style="width:90px" type="number" min="0" id="nr" placeholder="Reorder">' +
+        '<button class="btn small" id="nadd">Add</button></div>' +
+        '<p class="hint">Red rows are at/under reorder level. Quantities live here, not in the workbook.</p></div>');
+      wireStaffNav();
+      el('fc').onchange = function () { localStorage.setItem('jps_stock_fc', el('fc').value); vStock(); };
+      function save(code, qty, ro) {
+        api('stock.upsert', { facility_code: el('fc').value, item_code: code, qty: qty, reorder_level: ro })
+          .then(vStock).catch(function (e) { alert(e.message); });
+      }
+      Array.prototype.forEach.call(document.querySelectorAll('[data-save]'), function (b) {
+        var c = b.getAttribute('data-save');
+        b.onclick = function () { save(c, el('q-' + c).value, el('r-' + c).value); };
+      });
+      el('nadd').onclick = function () { save(el('ni').value, el('nq').value, el('nr').value); };
+    });
+  }).catch(function (e) { if (e.code === 'auth' || e.code === 'forbidden') return logout(); render('<div class="err">' + esc(e.message) + '</div>'); });
+}
+
+function vIssues() {
+  render('<div class="spin">Loading…</div>');
+  var isAdmin = S.user.role === 'admin';
+  api('staff.issueList', {}).then(function (d) {
+    var rows = d.issues.map(function (i) {
+      var act = (isAdmin && i.status === 'open')
+        ? '<div class="rowline"><input id="ir-' + esc(i.id) + '" type="text" placeholder="Response">' +
+          '<button class="btn small ghost" data-close="' + esc(i.id) + '">Close</button></div>' : '';
+      return '<div class="tip' + (i.status === 'open' ? '' : ' ') + '"><b>' + esc(i.by) + '</b> · ' + esc(i.category) +
+        ' · <span class="badge ' + (i.status === 'open' ? 'b-NEW' : 'b-RESOLVED') + '">' + esc(i.status) + '</span>' +
+        '<div>' + esc(i.text) + '</div>' +
+        (i.response ? '<div class="hint">↳ ' + esc(i.response) + '</div>' : '') + act + '</div>';
+    }).join('') || '<p class="hint">No issues raised</p>';
+    render('<h1>Support issues</h1>' + staffNav('#issues') +
+      '<div class="card"><h2>Raise an issue</h2><div id="msg"></div>' +
+      '<label>Category</label><select id="ic"><option>supplies</option><option>equipment</option>' +
+      '<option>app</option><option>other</option></select>' +
+      '<label>Describe it</label><textarea id="it" maxlength="1000"></textarea>' +
+      '<div style="height:10px"></div><button class="btn small" id="igo">Submit</button></div>' +
+      '<div class="card"><h2>' + (isAdmin ? 'All issues' : 'My issues') + '</h2>' + rows + '</div>');
+    wireStaffNav();
+    el('igo').onclick = function () {
+      api('staff.issueCreate', { category: el('ic').value, text: el('it').value })
+        .then(vIssues).catch(function (e) { el('msg').innerHTML = '<div class="err">' + esc(e.message) + '</div>'; });
+    };
+    Array.prototype.forEach.call(document.querySelectorAll('[data-close]'), function (b) {
+      var id = b.getAttribute('data-close');
+      b.onclick = function () {
+        api('admin.issueClose', { id: id, response: (el('ir-' + id) || {}).value || '' })
+          .then(vIssues).catch(function (e) { alert(e.message); });
+      };
+    });
+  }).catch(function (e) { if (e.code === 'auth' || e.code === 'forbidden') return logout(); render('<div class="err">' + esc(e.message) + '</div>'); });
+}
+
+function vBcast() {
+  render('<div class="spin">Loading…</div>');
+  api('meta.broadcasts', {}).then(function (d) {
+    var rows = d.broadcasts.map(function (b) {
+      return '<div class="tip"><b>' + esc(b.title) + '</b><div>' + esc(b.body) + '</div>' +
+        '<div class="hint">' + esc(b.at) + '</div>' +
+        '<button class="btn small ghost" data-end="' + esc(b.id) + '">End broadcast</button></div>';
+    }).join('') || '<p class="hint">No active broadcasts</p>';
+    render('<h1>Broadcasts</h1>' + staffNav('#bcast') +
+      '<div class="card"><h2>Publish a notice</h2><div id="msg"></div>' +
+      '<p class="hint">Shows on every farmer\'s home screen until ended. Telugu first, English second.</p>' +
+      '<label>Title</label><input id="bt" type="text" maxlength="120">' +
+      '<label>Details</label><textarea id="bb" maxlength="1000"></textarea>' +
+      '<div style="height:10px"></div><button class="btn small" id="bgo">Publish</button></div>' +
+      '<div class="card"><h2>Active</h2>' + rows + '</div>');
+    wireStaffNav();
+    el('bgo').onclick = function () {
+      api('admin.broadcast', { title: el('bt').value, body: el('bb').value })
+        .then(vBcast).catch(function (e) { el('msg').innerHTML = '<div class="err">' + esc(e.message) + '</div>'; });
+    };
+    Array.prototype.forEach.call(document.querySelectorAll('[data-end]'), function (b) {
+      b.onclick = function () {
+        api('admin.broadcastEnd', { id: b.getAttribute('data-end') }).then(vBcast)
+          .catch(function (e) { alert(e.message); });
+      };
+    });
+  }).catch(function (e) { if (e.code === 'auth' || e.code === 'forbidden') return logout(); render('<div class="err">' + esc(e.message) + '</div>'); });
+}
+
 function vStaff(msg) {
   stopPoll();
   var nb = S.meta && S.meta.needsBootstrap;
@@ -537,6 +734,9 @@ function vVet(tab) {
     var lists = { fresh: rows(q.fresh, true), mine: rows(q.mine, false), closedToday: rows(q.closedToday, false) };
     render(
       '<h1>Vet duty console <span class="hint">' + esc(S.user.name) + '</span></h1>' +
+      staffNav('#vet') +
+      '<div class="rowline"><button class="btn small ' + (q.on_call ? 'green' : 'amber') + '" id="avbtn">' +
+      (q.on_call ? '🟢 On call — tap to go off' : '🟠 Off call — tap to go on') + '</button></div>' +
       '<p class="hint">SLA first-response: per service catalogue (default emergency ' + q.sla.emergency + ' min · normal ' + q.sla.normal + ' min). Red rows breached.</p>' +
       '<div class="tabs">' +
       '<button data-t="fresh" class="' + (tab === 'fresh' ? 'on' : '') + '">Open (' + q.fresh.length + ')</button>' +
@@ -545,6 +745,11 @@ function vVet(tab) {
       '<div class="card"><table><tr><th>Token</th><th>Case</th><th>Location</th><th></th></tr>' + lists[tab] + '</table></div>' +
       (S.user.role === 'admin' ? '<a class="btn ghost" href="#admin">Admin dashboard →</a>' : '') +
       '<p style="text-align:center"><a href="#" id="lo" class="hint">Logout</a></p>');
+    wireStaffNav();
+    el('avbtn').onclick = function () {
+      api('staff.availability', { on: q.on_call ? 0 : 1 }).then(function () { vVet(tab); })
+        .catch(function (e) { alert(e.message); });
+    };
     Array.prototype.forEach.call(document.querySelectorAll('[data-t]'), function (b) {
       b.onclick = function () { vVet(b.getAttribute('data-t')); };
     });
@@ -614,6 +819,11 @@ function route() {
   if (h === '#new') return vNew();
   if (h === '#home') return vHome();
   if (h === '#tips') return vTips();
+  if (h === '#att') return vAttend();
+  if (h === '#leave') return vLeave();
+  if (h === '#stock') return vStock();
+  if (h === '#issues') return vIssues();
+  if (h === '#bcast') return vBcast();
   return vIdentify();
 }
 window.addEventListener('hashchange', route);
