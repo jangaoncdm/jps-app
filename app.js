@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.4.0-M3 b001
+/* JPS app.js — BUILD JPS v0.4.0-M3 b002
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.4.0-M3 b001';
+var BUILD = 'JPS v0.4.0-M3 b002';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', pic:'🐄' }, { v:'buffalo', te:'గేదె', en:'Buffalo', pic:'🐃' },
@@ -509,19 +509,49 @@ function vAttend() {
     var last = d.records[0];
     var nextIn = !last || last.type === 'out';
     var rows = d.records.map(function (r) {
-      return '<tr><td>' + (r.type === 'in' ? '✅ In' : '🏁 Out') + '</td><td>' + esc(r.at) + '</td></tr>';
+      var loc = (r.lat && r.lng)
+        ? ' <a target="_blank" rel="noopener" href="' + mapsLink(r.lat, r.lng) + '">📍</a>' : '';
+      var ph = r.has_photo ? ' <a href="#" data-ph="' + esc(r.id) + '">📷</a>' : '';
+      return '<tr><td>' + (r.type === 'in' ? '✅ In' : '🏁 Out') + loc + ph +
+        '<div id="phbox-' + esc(r.id) + '"></div></td><td>' + esc(r.at) + '</td></tr>';
     }).join('') || '<tr><td colspan="2" class="hint">No records yet</td></tr>';
     render('<h1>Attendance</h1>' + staffNav('#att') +
-      '<div class="card" style="text-align:center">' +
+      '<div class="card" style="text-align:center"><div id="msg"></div>' +
+      '<label style="text-align:left">Photo (camera) — required</label>' +
+      '<input id="af" type="file" accept="image/*" capture="user">' +
+      '<p class="hint">Your location is captured automatically when you tap the button.</p>' +
       '<button class="btn ' + (nextIn ? 'green' : 'amber') + '" id="att">' +
       (nextIn ? '✅ Check in' : '🏁 Check out') + '</button></div>' +
       '<div class="card"><h2>My recent records</h2><table>' + rows + '</table></div>');
     wireStaffNav();
     el('att').onclick = function () {
+      if (!el('af').files[0]) { el('msg').innerHTML = '<div class="err">Take a photo first — attendance needs it</div>'; return; }
       el('att').disabled = true;
-      api('staff.attend', { type: nextIn ? 'in' : 'out' }).then(vAttend)
-        .catch(function (e) { alert(e.message); vAttend(); });
+      el('att').textContent = 'Getting location…';
+      if (!navigator.geolocation) { el('msg').innerHTML = '<div class="err">GPS unavailable on this device</div>'; el('att').disabled = false; return; }
+      navigator.geolocation.getCurrentPosition(function (pos) {
+        compressPhoto(el('af').files[0]).then(function (b64) {
+          return api('staff.attend', { type: nextIn ? 'in' : 'out', photo_b64: b64,
+            photo_mime: 'image/jpeg',
+            lat: pos.coords.latitude.toFixed(6), lng: pos.coords.longitude.toFixed(6) });
+        }).then(vAttend).catch(function (e) {
+          el('msg').innerHTML = '<div class="err">' + esc(e.message) + '</div>';
+          el('att').disabled = false; el('att').textContent = nextIn ? '✅ Check in' : '🏁 Check out';
+        });
+      }, function () {
+        el('msg').innerHTML = '<div class="err">Could not get location — switch on GPS and try again</div>';
+        el('att').disabled = false; el('att').textContent = nextIn ? '✅ Check in' : '🏁 Check out';
+      }, { enableHighAccuracy: true, timeout: 15000 });
     };
+    Array.prototype.forEach.call(document.querySelectorAll('[data-ph]'), function (a) {
+      a.onclick = function (ev) {
+        ev.preventDefault();
+        api('staff.attendPhoto', { id: a.getAttribute('data-ph') }).then(function (d2) {
+          el('phbox-' + a.getAttribute('data-ph')).innerHTML =
+            '<img class="ph" style="max-width:140px" src="data:' + esc(d2.photo.mime) + ';base64,' + d2.photo.b64 + '">';
+        }).catch(function (e) { alert(e.message); });
+      };
+    });
   }).catch(function (e) { if (e.code === 'auth' || e.code === 'forbidden') return logout(); render('<div class="err">' + esc(e.message) + '</div>'); });
 }
 
