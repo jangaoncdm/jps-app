@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.5.0-M4 b003
+/* JPS app.js — BUILD JPS v0.5.0-M4 b004
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.5.0-M4 b003';
+var BUILD = 'JPS v0.5.0-M4 b004';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', pic:'🐄' }, { v:'buffalo', te:'గేదె', en:'Buffalo', pic:'🐃' },
@@ -409,6 +409,10 @@ function vTicket(ticket) {
     var visit = r.visit_date
       ? '<p>📅 ' + esc(T('సందర్శన', 'Visit')) + ': <b>' + esc(r.visit_date) + (r.visit_slot ? ' — ' + esc(r.visit_slot) : '') + '</b></p>' : '';
     var photo = r.photo ? '<p><img class="ph" src="data:' + esc(r.photo.mime) + ';base64,' + r.photo.b64 + '"></p>' : '';
+    var report = r.diagnosis
+      ? '<div class="card"><h2>🩺 ' + TL('డాక్టర్ నివేదిక', "Doctor's report") + '</h2>' +
+        '<p>' + esc(r.diagnosis) + '</p>' +
+        (r.vet ? '<p class="hint">— ' + esc(r.vet.name) + '</p>' : '') + '</div>' : '';
     var rx = (r.prescriptions || []).map(function (p) {
       return '<div class="card"><h2>💊 ' + TL('మందుల చీటీ', 'Prescription') + '</h2>' +
         '<p class="hint">' + esc(p.at) + '</p>' +
@@ -447,7 +451,8 @@ function vTicket(ticket) {
           : '<div class="rowline"><a class="btn small" href="tel:' + esc(r.farmer.phone) + '">📞 Call farmer</a>' +
             '<button class="btn small green" id="vidbtn">🎥 ' + (r.video_room ? 'Video call link' : 'Start video call') + '</button></div>' +
             '<p class="hint">First video call on this phone: Jitsi asks the host to sign in — use your own Gmail, one time only. Farmers never need an account.</p>' +
-            '<label>Notes</label><textarea id="note" maxlength="1000"></textarea>' +
+            '<label>Diagnosis, treatment given &amp; advice <span class="en">(required to resolve)</span></label>' +
+            '<textarea id="note" maxlength="1000" placeholder="Findings / diagnosis · treatment given · advice to farmer"></textarea>' +
             '<label>Prescription photo (optional — sent with any action)</label>' +
             '<input id="rxf" type="file" accept="image/*" capture="environment">' +
             '<div class="rowline"><button class="btn small ghost" data-a="log_call">Log call</button></div>' +
@@ -473,7 +478,7 @@ function vTicket(ticket) {
       (r.pashu_tag ? '<p class="hint">Ear tag: ' + esc(r.pashu_tag) + '</p>' : '') +
       visit + farmer + farmLoc + vet + photo + '</div>' + video +
       (!staff ? facilityCard(r.facility, T('మీ పశు వైద్య కేంద్రం', 'Your veterinary centre')) : '') +
-      rx + actions +
+      report + rx + actions +
       '<div class="card"><h2>' + TL('పురోగతి', 'Progress') + '</h2><ul class="rail">' + events + '</ul></div>' +
       '<a class="btn ghost" href="' + (staff ? '#vet' : '#home') + '">← ' + (staff ? 'Queue' : esc(T('హోమ్', 'Home'))) + '</a>');
     if (el('vjoin')) el('vjoin').addEventListener('click', function () {
@@ -801,7 +806,7 @@ function vStaff(msg) {
     '<button class="btn" id="gbtn">Sign in with Google</button>' +
     '<p class="hint" style="margin-top:8px">Works after the district OAuth client is configured; until then use the access code.</p></div>' +
     '<div class="card"><h2>Access code</h2>' +
-    '<label>Email</label><input id="se" type="email">' +
+    '<label>Email</label><input id="se" type="email" value="' + esc(localStorage.getItem('jps_staff_email') || '') + '">' +
     '<label>Access code</label><input id="sc" type="text" autocapitalize="characters">' +
     '<div style="height:10px"></div><button class="btn ghost" id="cbtn">Sign in</button></div>' +
     (nb ? '<div class="card"><h2>First-time setup (bootstrap admin)</h2>' +
@@ -820,7 +825,10 @@ function vStaff(msg) {
   };
   el('cbtn').onclick = function () {
     api('staff.code', { email: el('se').value, code: el('sc').value })
-      .then(function (d) { saveAuth(d.token, d.user); location.hash = d.user.role === 'admin' ? '#admin' : '#vet'; })
+      .then(function (d) {
+        localStorage.setItem('jps_staff_email', el('se').value);
+        saveAuth(d.token, d.user); location.hash = d.user.role === 'admin' ? '#admin' : '#vet';
+      })
       .catch(function (e) { vStaff({ ok: false, text: e.message }); });
   };
   if (nb) el('bbtn').onclick = function () {
@@ -833,17 +841,17 @@ function vStaff(msg) {
 function vVet(tab) {
   tab = tab || 'fresh';
   render('<div class="spin">Loading queue…</div>');
-  Promise.all([api('vet.queue', {}), api('me.notifications', {}).catch(function () { return { notifications: [] }; })])
+  Promise.all([api('vet.queue', {}), api('staff.alerts', {}).catch(function () { return { alerts: [] }; })])
   .then(function (both) {
     var q = both[0];
-    var alerts = (both[1].notifications || []).slice(0, 3).map(function (n) {
+    var alerts = (both[1].alerts || []).map(function (n) {
       return '<div class="tip warn"><b>' + esc(n.title) + '</b>' +
         (n.ticket ? ' — <a href="#t/' + esc(n.ticket) + '">' + esc(n.ticket) + '</a>' : '') +
         '<div class="hint">' + esc(n.body) + ' · ' + esc(String(n.at).slice(5, 16)) + '</div></div>';
     }).join('');
     function rows(list, claimable) {
       return list.map(function (r) {
-        return '<tr class="' + (r.sla_breach ? 'breach' : '') + '">' +
+        return '<tr class="' + ((r.sla_breach || r.resolve_breach) ? 'breach' : '') + '">' +
           '<td><a href="#t/' + esc(r.ticket) + '"><b>' + esc(r.ticket) + '</b></a>' +
           (r.emergency ? ' <span class="badge b-ESCALATED">EMG</span>' : '') +
           '<br><span class="hint">' + r.minutes_open + ' min</span></td>' +
@@ -861,7 +869,10 @@ function vVet(tab) {
       staffNav('#vet') + alerts +
       '<div class="rowline"><button class="btn small ' + (q.on_call ? 'green' : 'amber') + '" id="avbtn">' +
       (q.on_call ? '🟢 On call — tap to go off' : '🟠 Off call — tap to go on') + '</button></div>' +
-      '<p class="hint">SLA first-response: per service catalogue (default emergency ' + q.sla.emergency + ' min · normal ' + q.sla.normal + ' min). Red rows breached.</p>' +
+      '<p class="hint">' + (q.jurisdiction && q.jurisdiction.length
+        ? 'Your centres: <b>' + q.jurisdiction.join(', ') + '</b> — you see cases routed to them (and unrouted ones).'
+        : (S.user.role === 'admin' ? 'District-wide view.' : 'District-wide view (this account is not mapped to a centre in the staff master).')) +
+      ' Red rows breach response or resolution SLA.</p>' +
       '<div class="tabs">' +
       '<button data-t="fresh" class="' + (tab === 'fresh' ? 'on' : '') + '">Open (' + q.fresh.length + ')</button>' +
       '<button data-t="mine" class="' + (tab === 'mine' ? 'on' : '') + '">Mine (' + q.mine.length + ')</button>' +
