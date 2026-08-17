@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.5.0-M4 b002
+/* JPS app.js — BUILD JPS v0.5.0-M4 b003
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.5.0-M4 b002';
+var BUILD = 'JPS v0.5.0-M4 b003';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', pic:'🐄' }, { v:'buffalo', te:'గేదె', en:'Buffalo', pic:'🐃' },
@@ -299,7 +299,10 @@ function vNew() {
   loadMasters().then(function (M) {
     var tiles = SPECIES.map(function (s) {
       return '<label class="tile"><input type="radio" name="sp" value="' + s.v + '">' +
-        '<span class="pic">' + s.pic + '</span>' + esc(S.lang === 'en' ? s.en : s.te) +
+        '<img class="spimg" src="img/' + s.v + '.jpg" alt="" ' +
+        'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'block\'">' +
+        '<span class="pic" style="display:none">' + s.pic + '</span>' +
+        esc(S.lang === 'en' ? s.en : s.te) +
         (S.lang === 'both' ? '<span class="en">' + s.en + '</span>' : '') + '</label>';
     }).join('');
     var cats = [];
@@ -413,13 +416,28 @@ function vTicket(ticket) {
     }).join('');
     var svcLine = r.service ? '<p>' + esc(T(r.service.te, r.service.en)) + ' <span class="hint">(' + esc(r.service.code) + ')</span></p>' : '';
     var caseOpen = r.status === 'ASSIGNED' || r.status === 'VISIT_SCHEDULED';
-    var video = (caseOpen && r.video_room)
-      ? '<a class="btn green" target="_blank" rel="noopener" href="' + JITSI + esc(r.video_room) + '">🎥 ' +
-        esc(T('వీడియో కాల్‌లో చేరండి', 'Join video call')) + '</a>' +
-        (staff ? '' : '<p class="hint" style="text-align:center;margin-top:6px">' +
+    var video = '';
+    if (caseOpen && !staff) {
+      if (r.video_room) {
+        // joining also "knocks" so the doctor is alerted that the farmer is waiting
+        video = '<a class="btn green" id="vjoin" target="_blank" rel="noopener" href="' + JITSI + esc(r.video_room) + '">🎥 ' +
+          esc(T('వీడియో కాల్‌లో చేరండి', 'Join video call')) + '</a>' +
+          '<p class="hint" style="text-align:center;margin-top:6px">' +
           esc(T('డాక్టర్ చేరగానే కాల్ మొదలవుతుంది — మీకు ఎలాంటి ఖాతా అవసరం లేదు',
-                'The call starts when the doctor joins — you never need an account')) + '</p>') +
-        '<div style="height:8px"></div>' : '';
+                'The call starts when the doctor joins — you never need an account')) + '</p>' +
+          '<div style="height:8px"></div>';
+      } else if (r.vet) {
+        video = '<button class="btn ghost" id="vreq">🎥 ' +
+          esc(T('వీడియో కాల్ కావాలి', 'Request a video call')) + '</button>' +
+          '<div id="vreqmsg"></div><div style="height:8px"></div>';
+      }
+    }
+    if (caseOpen && staff && r.video_room) {
+      video = '<div class="card"><div class="rowline">' +
+        '<a class="btn small green" href="org.jitsi.meet://meet.jit.si/' + esc(r.video_room) + '">🎥 Open in Jitsi app</a>' +
+        '<a class="btn small ghost" target="_blank" rel="noopener" href="' + JITSI + esc(r.video_room) + '">🌐 Join in browser</a></div>' +
+        '<p class="hint">Best experience: <a target="_blank" rel="noopener" href="https://play.google.com/store/apps/details?id=org.jitsi.meet">install the free Jitsi Meet app</a> once and sign in with your Gmail — you stay the call host. In the browser, sign in with Gmail when Jitsi asks.</p></div>';
+    }
     var actions = '';
     if (staff && (r.status === 'NEW' || r.status === 'ASSIGNED' || r.status === 'VISIT_SCHEDULED')) {
       var slotOpts = SLOTS.map(function (s) { return '<option value="' + s.te + ' · ' + s.en + '">' + s.te + ' · ' + s.en + '</option>'; }).join('');
@@ -458,6 +476,17 @@ function vTicket(ticket) {
       rx + actions +
       '<div class="card"><h2>' + TL('పురోగతి', 'Progress') + '</h2><ul class="rail">' + events + '</ul></div>' +
       '<a class="btn ghost" href="' + (staff ? '#vet' : '#home') + '">← ' + (staff ? 'Queue' : esc(T('హోమ్', 'Home'))) + '</a>');
+    if (el('vjoin')) el('vjoin').addEventListener('click', function () {
+      api('video.knock', { id: r.id }).catch(function () {});
+    });
+    if (el('vreq')) el('vreq').onclick = function () {
+      el('vreq').disabled = true;
+      api('video.knock', { id: r.id }).then(function () {
+        el('vreqmsg').innerHTML = '<div class="ok">' +
+          esc(T('డాక్టర్‌కు తెలియజేశాం — కాల్ మొదలైతే ఇక్కడ బటన్ కనిపిస్తుంది',
+                'Doctor notified — a Join button appears here when the call starts')) + '</div>';
+      }).catch(function (e) { el('vreq').disabled = false; alert(e.message); });
+    };
     if (staff && el('acts')) {
       if (el('claim')) el('claim').onclick = function () {
         api('vet.claim', { id: r.id }).then(function () { vTicket(ticket); })
@@ -804,7 +833,14 @@ function vStaff(msg) {
 function vVet(tab) {
   tab = tab || 'fresh';
   render('<div class="spin">Loading queue…</div>');
-  api('vet.queue', {}).then(function (q) {
+  Promise.all([api('vet.queue', {}), api('me.notifications', {}).catch(function () { return { notifications: [] }; })])
+  .then(function (both) {
+    var q = both[0];
+    var alerts = (both[1].notifications || []).slice(0, 3).map(function (n) {
+      return '<div class="tip warn"><b>' + esc(n.title) + '</b>' +
+        (n.ticket ? ' — <a href="#t/' + esc(n.ticket) + '">' + esc(n.ticket) + '</a>' : '') +
+        '<div class="hint">' + esc(n.body) + ' · ' + esc(String(n.at).slice(5, 16)) + '</div></div>';
+    }).join('');
     function rows(list, claimable) {
       return list.map(function (r) {
         return '<tr class="' + (r.sla_breach ? 'breach' : '') + '">' +
@@ -822,7 +858,7 @@ function vVet(tab) {
     var lists = { fresh: rows(q.fresh, true), mine: rows(q.mine, false), closedToday: rows(q.closedToday, false) };
     render(
       '<h1>Vet duty console <span class="hint">' + esc(S.user.name) + '</span></h1>' +
-      staffNav('#vet') +
+      staffNav('#vet') + alerts +
       '<div class="rowline"><button class="btn small ' + (q.on_call ? 'green' : 'amber') + '" id="avbtn">' +
       (q.on_call ? '🟢 On call — tap to go off' : '🟠 Off call — tap to go on') + '</button></div>' +
       '<p class="hint">SLA first-response: per service catalogue (default emergency ' + q.sla.emergency + ' min · normal ' + q.sla.normal + ' min). Red rows breached.</p>' +
