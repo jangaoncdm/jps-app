@@ -26,9 +26,10 @@ Goal: no manual editor steps ever again; clean data; first real users.
 - [x] `scripts/deploy-app.sh` (client → GitHub Pages)
 - [x] Owner one-time clasp login (district profile at `..\.clasp-district` — coexists with other accounts)
 - [x] First automated deploy shipped b003 incl. video backend — 11/11 live checks
-- [ ] Sheet cleanup: delete all test rows (Users/Requests/Events/Sessions/Prescriptions) + test photos
-      (keep admin district.jana@gmail.com; test vets Dr Test / Dr Test Vet go too before go-live)
-- [ ] Pilot rollout: WhatsApp the app link to field officers of 1–2 mandals; collect feedback weekly
+- [x] Database purged clean (2026-08-17): all test data + photos removed, 9/9 go-live checks pass;
+      daily 7 AM job (follow-ups + retention) confirmed scheduled
+- [ ] Pilot rollout — THE ONLY REMAINING STEP: WhatsApp the `SHARE.md` message to field officers of
+      1–2 mandals, print `poster.html` for milk points; review feedback weekly
 Definition of Done: one command deploys backend + client; live suite green; zero test rows; ≥1 mandal using it.
 
 ## Phase C — Internal staff modules (v0.4.0-M3 b001) ✅ done (19 live checks)
