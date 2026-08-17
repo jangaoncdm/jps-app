@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.5.0-M4 b001
+/* JPS app.js — BUILD JPS v0.5.0-M4 b002
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.5.0-M4 b001';
+var BUILD = 'JPS v0.5.0-M4 b002';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', pic:'🐄' }, { v:'buffalo', te:'గేదె', en:'Buffalo', pic:'🐃' },
@@ -854,7 +854,20 @@ function vVet(tab) {
 
 function vAdmin() {
   render('<div class="spin">Loading dashboard…</div>');
-  api('admin.stats', {}).then(function (st) {
+  Promise.all([api('admin.stats', {}), api('admin.links', {}).catch(function () { return {}; })])
+  .then(function (both) {
+    var st = both[0], lk = both[1];
+    // authuser pins Google links to the account this admin logged in with, so they
+    // open correctly even when other Gmail accounts are signed into the browser
+    var au = '?authuser=' + encodeURIComponent(S.user.email || '');
+    var quick = '<div class="card"><h2>Quick links</h2>' +
+      '<p class="hint">Google links open as <b>' + esc(S.user.email) + '</b> even if other accounts are signed in.</p>' +
+      '<div class="rowline">' +
+      (lk.spreadsheet_id ? '<a class="btn small ghost" target="_blank" rel="noopener" href="https://docs.google.com/spreadsheets/d/' + esc(lk.spreadsheet_id) + '/edit' + au + '">📊 Database Sheet</a>' : '') +
+      (lk.photos_folder_id ? '<a class="btn small ghost" target="_blank" rel="noopener" href="https://drive.google.com/drive/folders/' + esc(lk.photos_folder_id) + au + '">🖼️ Photos folder</a>' : '') +
+      '<a class="btn small ghost" target="_blank" rel="noopener" href="poster.html">🪧 QR poster</a>' +
+      '<a class="btn small ghost" target="_blank" rel="noopener" href="https://github.com/jangaoncdm/jps-app">🛠️ App repo</a>' +
+      '</div></div>';
     var mrows = Object.keys(st.byMandal).sort(function (a, b) { return st.byMandal[b] - st.byMandal[a]; })
       .map(function (m) { return '<tr><td>' + esc(m) + '</td><td>' + st.byMandal[m] + '</td></tr>'; }).join('') ||
       '<tr><td colspan="2" class="hint">No data yet</td></tr>';
@@ -886,7 +899,7 @@ function vAdmin() {
           bar('GREEN — advice closed', L.byDisposition.GREEN, 'var(--ok)') +
           bar('AMBER — visits', L.byDisposition.AMBER, 'var(--accent)') +
           bar('RED — escalated 1962', L.byDisposition.RED, 'var(--red)') + '</div>';
-      })() +
+      })() + quick +
       '<div class="card"><h2>Open requests</h2><table><tr><th>Token</th><th>Status</th><th>Mandal</th><th>Age</th></tr>' + orows + '</table>' +
       '<p class="hint">Full data lives in the Google Sheet — open it for filters, pivots and exports.</p></div>' +
       '<div class="card"><h2>Requests by mandal</h2><table><tr><th>Mandal</th><th>#</th></tr>' + mrows + '</table></div>' +
