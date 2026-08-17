@@ -99,6 +99,15 @@ padding:12px 14px;margin:10px 0;border-top:1px solid var(--line);border-right:1p
 .tip.warn{border-left-color:var(--red)}
 footer{color:var(--muted);font-size:12px;text-align:center;margin-top:24px}
 .spin{text-align:center;color:var(--muted);padding:26px 0}
+.fixbar{position:fixed;left:0;right:0;bottom:0;z-index:9;background:var(--brand-ink);color:#fff;
+padding:10px 14px calc(10px + env(safe-area-inset-bottom));display:flex;gap:10px;align-items:center;
+box-shadow:0 -2px 10px rgba(30,27,75,.25)}
+.fixbar .tx{flex:1;font-size:14.5px}
+.fixbar button{background:#fff;color:var(--brand-deep);border:none;border-radius:10px;
+padding:9px 16px;font-family:inherit;font-weight:700;font-size:15px;cursor:pointer}
+video.cam{width:100%;max-width:320px;border-radius:14px;background:#000}
+.bar{height:9px;border-radius:5px;background:var(--line);overflow:hidden;margin:4px 0 10px}
+.bar i{display:block;height:100%}
 @media(min-width:560px){.tiles{grid-template-columns:repeat(4,1fr)}.stats{grid-template-columns:repeat(4,1fr)}}
 </style>
 </head>
@@ -109,6 +118,13 @@ footer{color:var(--muted);font-size:12px;text-align:center;margin-top:24px}
   <button id="langbtn" title="Language"></button>
 </header>
 <div class="wrap" id="view"><div class="spin">లోడ్ అవుతోంది…</div></div>
+<div class="fixbar" id="instbar" hidden>
+  <span class="tx">📲 యాప్‌గా ఇన్‌స్టాల్ చేసుకోండి — వేగంగా, ఆఫ్‌లైన్‌లోనూ<br><span style="opacity:.75;font-size:12.5px">Install as an app — faster, works offline</span></span>
+  <button id="instbtn">Install</button>
+</div>
+<div class="fixbar" id="wvbar" hidden>
+  <span class="tx">ఇన్‌స్టాల్ చేయడానికి: మెనూ (⋮) → <b>Chrome లో తెరవండి</b><br><span style="opacity:.75;font-size:12.5px">To install: menu (⋮) → Open in Chrome</span></span>
+</div>
 <script src="app.js"></script>
 <script>
 if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {

@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.4.0-M3 b002
+/* JPS app.js — BUILD JPS v0.5.0-M4 b001
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.4.0-M3 b002';
+var BUILD = 'JPS v0.5.0-M4 b001';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', pic:'🐄' }, { v:'buffalo', te:'గేదె', en:'Buffalo', pic:'🐃' },
@@ -118,6 +118,32 @@ function facilityCard(f, title) {
     (f.hours ? '<div class="hint">' + esc(f.hours) + (f.weekly_off ? ' · ' + esc(T('సెలవు', 'Off')) + ': ' + esc(f.weekly_off) : '') + '</div>' : '') +
     '<div class="rowline">' + call + dir + '</div></div>';
 }
+// ---------------------------------------------------------------- install prompt + camera
+var installEvt = null;
+window.addEventListener('beforeinstallprompt', function (e) {
+  e.preventDefault(); installEvt = e;
+  var bar = document.getElementById('instbar');
+  if (bar) bar.hidden = false;
+});
+(function wireInstallBar() {
+  var btn = document.getElementById('instbtn');
+  if (btn) btn.onclick = function () {
+    if (!installEvt) return;
+    installEvt.prompt();
+    installEvt.userChoice.then(function () { document.getElementById('instbar').hidden = true; installEvt = null; });
+  };
+  var standalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
+  // WhatsApp/other in-app browsers (Android WebView) cannot install — point to Chrome
+  if (!standalone && / wv\)| WebView|; wv/.test(navigator.userAgent)) {
+    var wb = document.getElementById('wvbar');
+    if (wb) wb.hidden = false;
+  }
+})();
+var camStream = null;
+function stopCam() {
+  if (camStream) { camStream.getTracks().forEach(function (t) { t.stop(); }); camStream = null; }
+}
+
 function stopPoll() { if (S.poll) { clearInterval(S.poll); S.poll = null; } }
 function startPoll(reloadFn) {
   stopPoll();
@@ -517,24 +543,56 @@ function vAttend() {
     }).join('') || '<tr><td colspan="2" class="hint">No records yet</td></tr>';
     render('<h1>Attendance</h1>' + staffNav('#att') +
       '<div class="card" style="text-align:center"><div id="msg"></div>' +
-      '<label style="text-align:left">Photo (camera) — required</label>' +
-      '<input id="af" type="file" accept="image/*" capture="user">' +
+      '<label style="text-align:left">Live photo — camera only, no gallery</label>' +
+      '<video id="cam" class="cam" autoplay playsinline muted></video>' +
+      '<div id="campv"></div>' +
+      '<div class="rowline" style="justify-content:center"><button class="btn small ghost" id="snap">📸 Capture</button></div>' +
       '<p class="hint">Your location is captured automatically when you tap the button.</p>' +
-      '<button class="btn ' + (nextIn ? 'green' : 'amber') + '" id="att">' +
+      '<button class="btn ' + (nextIn ? 'green' : 'amber') + '" id="att" disabled>' +
       (nextIn ? '✅ Check in' : '🏁 Check out') + '</button></div>' +
       '<div class="card"><h2>My recent records</h2><table>' + rows + '</table></div>');
     wireStaffNav();
+    var camB64 = null;
+    function startCam() {
+      camB64 = null;
+      el('att').disabled = true;
+      el('campv').innerHTML = '';
+      el('cam').style.display = '';
+      el('snap').textContent = '📸 Capture';
+      if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) {
+        el('msg').innerHTML = '<div class="err">This browser has no live camera support — use Chrome</div>';
+        return;
+      }
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
+        .then(function (st) { camStream = st; el('cam').srcObject = st; })
+        .catch(function () { el('msg').innerHTML = '<div class="err">Allow camera access to mark attendance</div>'; });
+    }
+    startCam();
+    el('snap').onclick = function () {
+      if (camB64) { startCam(); return; } // retake
+      var v = el('cam');
+      if (!v.videoWidth) { el('msg').innerHTML = '<div class="err">Camera not ready yet</div>'; return; }
+      var cv = document.createElement('canvas');
+      var k = Math.min(1, 640 / v.videoWidth);
+      cv.width = Math.round(v.videoWidth * k); cv.height = Math.round(v.videoHeight * k);
+      cv.getContext('2d').drawImage(v, 0, 0, cv.width, cv.height);
+      camB64 = cv.toDataURL('image/jpeg', 0.7).split(',')[1];
+      stopCam();
+      v.style.display = 'none';
+      el('campv').innerHTML = '<img class="ph" style="max-width:200px" src="data:image/jpeg;base64,' + camB64 + '">';
+      el('snap').textContent = '🔄 Retake';
+      el('msg').innerHTML = '';
+      el('att').disabled = false;
+    };
     el('att').onclick = function () {
-      if (!el('af').files[0]) { el('msg').innerHTML = '<div class="err">Take a photo first — attendance needs it</div>'; return; }
+      if (!camB64) return;
       el('att').disabled = true;
       el('att').textContent = 'Getting location…';
-      if (!navigator.geolocation) { el('msg').innerHTML = '<div class="err">GPS unavailable on this device</div>'; el('att').disabled = false; return; }
+      if (!navigator.geolocation) { el('msg').innerHTML = '<div class="err">GPS unavailable on this device</div>'; return; }
       navigator.geolocation.getCurrentPosition(function (pos) {
-        compressPhoto(el('af').files[0]).then(function (b64) {
-          return api('staff.attend', { type: nextIn ? 'in' : 'out', photo_b64: b64,
-            photo_mime: 'image/jpeg',
-            lat: pos.coords.latitude.toFixed(6), lng: pos.coords.longitude.toFixed(6) });
-        }).then(vAttend).catch(function (e) {
+        api('staff.attend', { type: nextIn ? 'in' : 'out', photo_b64: camB64, photo_mime: 'image/jpeg',
+          lat: pos.coords.latitude.toFixed(6), lng: pos.coords.longitude.toFixed(6) })
+        .then(vAttend).catch(function (e) {
           el('msg').innerHTML = '<div class="err">' + esc(e.message) + '</div>';
           el('att').disabled = false; el('att').textContent = nextIn ? '✅ Check in' : '🏁 Check out';
         });
@@ -815,6 +873,20 @@ function vAdmin() {
       '<div class="stat"><div class="n">' + st.emergenciesOpen + '</div><div class="l">Emergencies</div></div>' +
       '<div class="stat"><div class="n" style="color:var(--red)">' + st.slaBreaches + '</div><div class="l">SLA breaches</div></div>' +
       '<div class="stat"><div class="n">' + st.resolvedToday + '</div><div class="l">Resolved today</div></div></div>' +
+      (function () {
+        var L = st.last30; if (!L) return '';
+        var mx = Math.max(L.byDisposition.GREEN, L.byDisposition.AMBER, L.byDisposition.RED, 1);
+        function bar(lbl, n, color) {
+          return '<div class="hint">' + lbl + ' — ' + n + '</div>' +
+            '<div class="bar"><i style="width:' + Math.round(n / mx * 100) + '%;background:' + color + '"></i></div>';
+        }
+        return '<div class="card"><h2>Last 30 days</h2>' +
+          '<p><b>' + L.total + '</b> requests · avg first response <b>' +
+          (L.avgFirstResponseMin == null ? '—' : L.avgFirstResponseMin + ' min') + '</b> (' + L.responded + ' responded)</p>' +
+          bar('GREEN — advice closed', L.byDisposition.GREEN, 'var(--ok)') +
+          bar('AMBER — visits', L.byDisposition.AMBER, 'var(--accent)') +
+          bar('RED — escalated 1962', L.byDisposition.RED, 'var(--red)') + '</div>';
+      })() +
       '<div class="card"><h2>Open requests</h2><table><tr><th>Token</th><th>Status</th><th>Mandal</th><th>Age</th></tr>' + orows + '</table>' +
       '<p class="hint">Full data lives in the Google Sheet — open it for filters, pivots and exports.</p></div>' +
       '<div class="card"><h2>Requests by mandal</h2><table><tr><th>Mandal</th><th>#</th></tr>' + mrows + '</table></div>' +
@@ -841,6 +913,7 @@ function vAdmin() {
 
 // ---------------------------------------------------------------- router
 function route() {
+  stopCam(); // release the camera whenever the screen changes
   var h = location.hash || '';
   if (h.indexOf('#t/') === 0) return vTicket(h.slice(3));
   if (h === '#staff') return vStaff();
