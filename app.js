@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.5.0-M4 b007
+/* JPS app.js — BUILD JPS v0.5.0-M4 b008
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.5.0-M4 b007';
+var BUILD = 'JPS v0.5.0-M4 b008';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', pic:'🐄' }, { v:'buffalo', te:'గేదె', en:'Buffalo', pic:'🐃' },
@@ -469,7 +469,7 @@ function vTicket(ticket) {
         (r.status === 'NEW'
           ? '<button class="btn" id="claim">Claim this case</button>'
           : '<div class="rowline"><a class="btn small" href="tel:' + esc(r.farmer.phone) + '">📞 Call user</a>' +
-            '<button class="btn small green" id="vidbtn">🎥 ' + (r.video_room ? 'Video call link' : 'Start video call') + '</button></div>' +
+            (r.video_room ? '' : '<button class="btn small green" id="vidbtn">🎥 Start video call</button>') + '</div>' +
             '<p class="hint">First video call on this phone: Jitsi asks the host to sign in — use your own Gmail, one time only. Users never need an account.</p>' +
             '<label>Observation &amp; diagnosis <span class="en">(required to resolve)</span></label>' +
             '<textarea id="note" maxlength="1000" placeholder="Findings · diagnosis · advice to the user"></textarea>' +
@@ -534,10 +534,9 @@ function vTicket(ticket) {
       };
       if (el('vidbtn')) el('vidbtn').onclick = function () {
         el('vidbtn').disabled = true;
-        api('vet.videoStart', { id: r.id }).then(function (d) {
-          window.open(JITSI + d.room, '_blank');
-          vTicket(ticket);
-        }).catch(function (e) { el('vidbtn').disabled = false; alert(e.message); });
+        // create the room only — the refreshed card offers Ring / WhatsApp / app / browser
+        api('vet.videoStart', { id: r.id }).then(function () { vTicket(ticket); })
+          .catch(function (e) { el('vidbtn').disabled = false; alert(e.message); });
       };
       Array.prototype.forEach.call(document.querySelectorAll('#acts [data-a]'), function (b) {
         b.onclick = function () {
