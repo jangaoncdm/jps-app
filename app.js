@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.5.0-M4 b005
+/* JPS app.js — BUILD JPS v0.5.0-M4 b006
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.5.0-M4 b005';
+var BUILD = 'JPS v0.5.0-M4 b006';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', pic:'🐄' }, { v:'buffalo', te:'గేదె', en:'Buffalo', pic:'🐃' },
@@ -402,10 +402,10 @@ function vTicket(ticket) {
         '<div class="when">' + esc(e.at) + '</div></li>';
     }).join('');
     var vet = r.vet ? '<p>' + esc(T('డాక్టర్', 'Doctor')) + ': <b>' + esc(r.vet.name) + '</b> — <a href="tel:' + esc(r.vet.phone) + '">' + esc(r.vet.phone) + '</a></p>' : '';
-    var farmer = staff && r.farmer ? '<p>Farmer: <b>' + esc(r.farmer.name) + '</b> · <a href="tel:' + esc(r.farmer.phone) + '">' + esc(r.farmer.phone) + '</a>' +
+    var farmer = staff && r.farmer ? '<p>User: <b>' + esc(r.farmer.name) + '</b> · <a href="tel:' + esc(r.farmer.phone) + '">' + esc(r.farmer.phone) + '</a>' +
       (r.farmer.status === 'unconfirmed' ? ' <span class="badge b-NEW">number unconfirmed</span>' : '') + '</p>' : '';
     var farmLoc = staff && r.farm_lat && r.farm_lng
-      ? '<p><a target="_blank" rel="noopener" href="' + mapsLink(r.farm_lat, r.farm_lng) + '">🗺️ Farmer location on map</a></p>' : '';
+      ? '<p><a target="_blank" rel="noopener" href="' + mapsLink(r.farm_lat, r.farm_lng) + '">🗺️ User location on map</a></p>' : '';
     var visit = r.visit_date
       ? '<p>📅 ' + esc(T('సందర్శన', 'Visit')) + ': <b>' + esc(r.visit_date) + (r.visit_slot ? ' — ' + esc(r.visit_slot) : '') + '</b></p>' : '';
     var photo = r.photo ? '<p><img class="ph" src="data:' + esc(r.photo.mime) + ';base64,' + r.photo.b64 + '"></p>' : '';
@@ -414,9 +414,20 @@ function vTicket(ticket) {
         '<p>' + esc(r.diagnosis) + '</p>' +
         (r.vet ? '<p class="hint">— ' + esc(r.vet.name) + '</p>' : '') + '</div>' : '';
     var rx = (r.prescriptions || []).map(function (p) {
-      return '<div class="card"><h2>💊 ' + TL('మందుల చీటీ', 'Prescription') + '</h2>' +
-        '<p class="hint">' + esc(p.at) + '</p>' +
-        '<img class="ph" src="data:' + esc(p.photo.mime) + ';base64,' + p.photo.b64 + '"></div>';
+      var head = '<div style="border-bottom:2px solid var(--brand);padding-bottom:8px;margin-bottom:10px">' +
+        '<div class="hint">పశుసంవర్ధక శాఖ · Veterinary &amp; AH Department, Jangaon</div>' +
+        (p.facility_name ? '<div><b>' + esc(p.facility_name) + '</b></div>' : '') +
+        (p.doctor_name ? '<div>Dr. ' + esc(p.doctor_name) + '</div>' : '') +
+        '<div class="hint">' + esc(p.at) + ' · ' + esc(r.ticket) + ' · ' + esc(spLabel(r.species)) +
+        (r.pashu_tag ? ' · Tag ' + esc(r.pashu_tag) : '') + '</div></div>';
+      var body =
+        (p.observation ? '<p><b>' + esc(T('పరిశీలన', 'Observation')) + ':</b> ' + esc(p.observation) + '</p>' : '') +
+        (p.rx_text ? '<p><b>℞</b></p><p style="white-space:pre-line;border-left:3px solid var(--line);padding-left:10px">' + esc(p.rx_text) + '</p>' : '') +
+        (p.tests ? '<p><b>' + esc(T('పరీక్షలు / సూచనలు', 'Tests / advice')) + ':</b> ' + esc(p.tests) + '</p>' : '') +
+        (p.photo ? '<img class="ph" src="data:' + esc(p.photo.mime) + ';base64,' + p.photo.b64 + '">' : '');
+      return '<div class="card"><h2>💊 ' + TL('మందుల చీటీ', 'Prescription') + '</h2>' + head + body +
+        '<div class="rowline"><button class="btn small ghost" onclick="window.print()">🖨️ ' +
+        esc(T('ప్రింట్ / సేవ్', 'Print / save')) + '</button></div></div>';
     }).join('');
     var svcLine = r.service ? '<p>' + esc(T(r.service.te, r.service.en)) + ' <span class="hint">(' + esc(r.service.code) + ')</span></p>' : '';
     var caseOpen = r.status === 'ASSIGNED' || r.status === 'VISIT_SCHEDULED';
@@ -448,13 +459,18 @@ function vTicket(ticket) {
       actions = '<div class="card" id="acts">' +
         (r.status === 'NEW'
           ? '<button class="btn" id="claim">Claim this case</button>'
-          : '<div class="rowline"><a class="btn small" href="tel:' + esc(r.farmer.phone) + '">📞 Call farmer</a>' +
+          : '<div class="rowline"><a class="btn small" href="tel:' + esc(r.farmer.phone) + '">📞 Call user</a>' +
             '<button class="btn small green" id="vidbtn">🎥 ' + (r.video_room ? 'Video call link' : 'Start video call') + '</button></div>' +
-            '<p class="hint">First video call on this phone: Jitsi asks the host to sign in — use your own Gmail, one time only. Farmers never need an account.</p>' +
-            '<label>Diagnosis, treatment given &amp; advice <span class="en">(required to resolve)</span></label>' +
-            '<textarea id="note" maxlength="1000" placeholder="Findings / diagnosis · treatment given · advice to farmer"></textarea>' +
-            '<label>Prescription photo (optional — sent with any action)</label>' +
+            '<p class="hint">First video call on this phone: Jitsi asks the host to sign in — use your own Gmail, one time only. Users never need an account.</p>' +
+            '<label>Observation &amp; diagnosis <span class="en">(required to resolve)</span></label>' +
+            '<textarea id="note" maxlength="1000" placeholder="Findings · diagnosis · advice to the user"></textarea>' +
+            '<label>Medicines — Rx <span class="en">(one per line; auto-becomes a prescription)</span></label>' +
+            '<textarea id="rxt" maxlength="1000" placeholder="Inj. ... dose · route · days&#10;Bolus ... "></textarea>' +
+            '<label>Tests / further advice <span class="en">(optional)</span></label>' +
+            '<textarea id="tst" maxlength="1000" placeholder="Blood smear · milk culture · revisit if ..."></textarea>' +
+            '<label>Prescription photo (optional)</label>' +
             '<input id="rxf" type="file" accept="image/*" capture="environment">' +
+            '<p class="hint">Anything written in Rx or Tests is issued as a formal prescription with your name, centre and time.</p>' +
             '<div class="rowline"><button class="btn small ghost" data-a="log_call">Log call</button></div>' +
             '<h2>Disposition</h2><div class="rowline">' +
             '<button class="btn small green" data-a="green">GREEN close</button>' +
@@ -480,7 +496,17 @@ function vTicket(ticket) {
       (!staff ? facilityCard(r.facility, T('మీ పశు వైద్య కేంద్రం', 'Your veterinary centre')) : '') +
       report + rx + actions +
       '<div class="card"><h2>' + TL('పురోగతి', 'Progress') + '</h2><ul class="rail">' + events + '</ul></div>' +
+      (!staff && (r.status === 'NEW' || caseOpen)
+        ? '<button class="btn ghost" style="color:var(--red);border-color:var(--red)" id="wd">✖ ' +
+          esc(T('అభ్యర్థన రద్దు చేయండి', 'Withdraw this request')) + '</button><div style="height:8px"></div>'
+        : '') +
       '<a class="btn ghost" href="' + (staff ? '#vet' : '#home') + '">← ' + (staff ? 'Queue' : esc(T('హోమ్', 'Home'))) + '</a>');
+    if (el('wd')) el('wd').onclick = function () {
+      if (!confirm(T('ఖచ్చితంగా రద్దు చేయాలా? ఇది వెనక్కి తీసుకోలేరు.', 'Withdraw this request? This cannot be undone.'))) return;
+      el('wd').disabled = true;
+      api('request.withdraw', { id: r.id }).then(function () { vTicket(ticket); })
+        .catch(function (e) { el('wd').disabled = false; alert(e.message); });
+    };
     if (el('vjoin')) el('vjoin').addEventListener('click', function () {
       api('video.knock', { id: r.id }).catch(function () {});
     });
@@ -512,6 +538,7 @@ function vTicket(ticket) {
             return api('vet.act', { id: r.id, action: b.getAttribute('data-a'),
               note: (el('note') || {}).value || '', visit_date: (el('vd') || {}).value || '',
               visit_slot: (el('vs') || {}).value || '',
+              rx_text: (el('rxt') || {}).value || '', tests: (el('tst') || {}).value || '',
               rx_b64: rxb64 || '', rx_mime: 'image/jpeg' });
           }).then(function () { vTicket(ticket); })
             .catch(function (e) { b.disabled = false; alert(e.message); });
@@ -814,7 +841,7 @@ function vStaff(msg) {
       '<label>Your name</label><input id="bn" type="text">' +
       '<label>Bootstrap code (from setup() log)</label><input id="bc" type="text" autocapitalize="characters">' +
       '<div style="height:10px"></div><button class="btn" id="bbtn">Create admin</button></div>' : '') +
-    '<p class="hint"><a href="#identify">← Farmer app</a></p>');
+    '<p class="hint"><a href="#identify">← User app</a></p>');
   el('gbtn').onclick = function () {
     tryGoogleSignIn().then(function (idt) {
       if (!idt) return vStaff({ ok: false, text: 'Google sign-in unavailable on this build — use access code.' });
