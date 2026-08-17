@@ -44,17 +44,21 @@ The app is now the department's daily tool. Shipped 2026-08-16:
 Not built (deliberately): F9 month-view roster — availability + attendance + leave cover on-duty
 tracking; revisit only if the DV&AHO asks for a printed monthly roster.
 
-## Phase D — Reach & notifications (v0.5) ⏳ later
-- FCM push notifications (needs district Firebase project + `google-services.json`)
-- Automated D-3/D-7 recovery follow-ups from the service catalogue
-- F4 GP latitude/longitude completion → farmer-location routing sharpens
-- Play Store release: Capacitor build, PhoneHint on-device verify, Play Console via
-  Government D-U-N-S route (`app/ANDROID.md`)
-- App Store (iOS) release: Capacitor iOS build — needs a Mac + Apple Developer account (~₹8,000/yr);
-  until then iPhone users install via Safari → Add to Home Screen (works today)
+## Phase D — Reach & notifications (v0.5.0-M4 b001) ✅ done except store listings
+- [x] Automated D-3/D-7/D-21/D-90 recovery follow-ups from the service catalogue — daily 7 AM job
+      (+ `admin.runDaily` for on-demand runs); farmer gets a Telugu check-in, timeline logs it
+- [x] Attendance hardened: LIVE camera capture only (no gallery), geo-tag mandatory
+- [x] Push plumbing (FCM HTTP v1) built and dormant — activates the moment the district Firebase
+      service-account JSON is pasted into `opsSetFcmServiceAccount`; no code changes needed
+- [x] Distribution kit: in-app Install button, WhatsApp-browser "Open in Chrome" hint,
+      printable QR poster (`/poster.html`), forward message + rollout process (`SHARE.md`)
+- [ ] F4 GP latitude/longitude completion (owner data task — sharpens routing when filled)
+- [ ] **DEFERRED by owner**: Play Store + App Store releases (Capacitor builds, D-U-N-S route)
 
-## Phase E — Scale & hardening ⏳ later
-- Photo/prescription retention job (DPDP: purge >12 months)
-- Analytics: mandal heatmaps, SLA trend reports for the Collectorate
-- Self-hosted Jitsi decision (breaks ₹0 — only if video volume justifies)
-- AWS migration triggers (FREEZE-v2): >1,000 requests/day, quota >60%, p95 >2.5 s, or a second district
+## Phase E — Scale & hardening ✅ automated portions done
+- [x] Retention job: daily sweep trashes case/prescription/attendance photos older than 12 months (DPDP)
+- [x] Analytics: last-30-days card on the admin dashboard (volume, avg first response, G/A/R split)
+- [x] Go-live cleanup is one click now: `opsPurgeTestData` in the editor (wipes all test data,
+      keeps the admin + test doctor accounts)
+- [ ] Self-hosted Jitsi decision (only if video volume justifies leaving ₹0)
+- [ ] AWS migration at the FREEZE-v2 triggers: >1,000 req/day, quota >60%, p95 >2.5 s, second district
