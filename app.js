@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.5.0-M4 b006
+/* JPS app.js — BUILD JPS v0.5.0-M4 b007
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.5.0-M4 b006';
+var BUILD = 'JPS v0.5.0-M4 b007';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', pic:'🐄' }, { v:'buffalo', te:'గేదె', en:'Buffalo', pic:'🐃' },
@@ -448,9 +448,18 @@ function vTicket(ticket) {
       }
     }
     if (caseOpen && staff && r.video_room) {
-      video = '<div class="card"><div class="rowline">' +
+      // wa.me wants a bare country-code number; farmer phones are stored as +91XXXXXXXXXX
+      var waPhone = r.farmer ? String(r.farmer.phone).replace(/\D/g, '') : '';
+      var waText = encodeURIComponent('జనగామ పశు సేవ ' + r.ticket + ': డాక్టర్ వీడియో కాల్‌కి పిలుస్తున్నారు. ఈ లింక్ నొక్కండి — యాప్ అవసరం లేదు:\n' +
+        JITSI + r.video_room + '\n(Doctor video call — tap the link to join, no app needed)');
+      video = '<div class="card">' +
+        '<div class="rowline">' +
         '<a class="btn small green" href="org.jitsi.meet://meet.jit.si/' + esc(r.video_room) + '">🎥 Open in Jitsi app</a>' +
         '<a class="btn small ghost" target="_blank" rel="noopener" href="' + JITSI + esc(r.video_room) + '">🌐 Join in browser</a></div>' +
+        (waPhone ? '<div class="rowline">' +
+          '<a class="btn small" style="background:#128C7E" target="_blank" rel="noopener" href="https://wa.me/' + waPhone + '?text=' + waText + '">🟢 Send call link on WhatsApp</a>' +
+          '<a class="btn small ghost" href="tel:' + esc(r.farmer.phone) + '">📞 Ring first</a></div>' +
+          '<p class="hint">Recommended flow: ring the user (a normal call they cannot miss), then send the WhatsApp link — they join straight from the message, without opening this app.</p>' : '') +
         '<p class="hint">Best experience: <a target="_blank" rel="noopener" href="https://play.google.com/store/apps/details?id=org.jitsi.meet">install the free Jitsi Meet app</a> once and sign in with your Gmail — you stay the call host. In the browser, sign in with Gmail when Jitsi asks.</p></div>';
     }
     var actions = '';
