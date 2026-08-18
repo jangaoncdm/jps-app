@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.5.0-M4 b008
+/* JPS app.js — BUILD JPS v0.5.0-M4 b009
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.5.0-M4 b008';
+var BUILD = 'JPS v0.5.0-M4 b009';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', pic:'🐄' }, { v:'buffalo', te:'గేదె', en:'Buffalo', pic:'🐃' },
@@ -432,35 +432,11 @@ function vTicket(ticket) {
     var svcLine = r.service ? '<p>' + esc(T(r.service.te, r.service.en)) + ' <span class="hint">(' + esc(r.service.code) + ')</span></p>' : '';
     var caseOpen = r.status === 'ASSIGNED' || r.status === 'VISIT_SCHEDULED';
     var video = '';
-    if (caseOpen && !staff) {
-      if (r.video_room) {
-        // joining also "knocks" so the doctor is alerted that the farmer is waiting
-        video = '<a class="btn green" id="vjoin" target="_blank" rel="noopener" href="' + JITSI + esc(r.video_room) + '">🎥 ' +
-          esc(T('వీడియో కాల్‌లో చేరండి', 'Join video call')) + '</a>' +
-          '<p class="hint" style="text-align:center;margin-top:6px">' +
-          esc(T('డాక్టర్ చేరగానే కాల్ మొదలవుతుంది — మీకు ఎలాంటి ఖాతా అవసరం లేదు',
-                'The call starts when the doctor joins — you never need an account')) + '</p>' +
-          '<div style="height:8px"></div>';
-      } else if (r.vet) {
-        video = '<button class="btn ghost" id="vreq">🎥 ' +
-          esc(T('వీడియో కాల్ కావాలి', 'Request a video call')) + '</button>' +
-          '<div id="vreqmsg"></div><div style="height:8px"></div>';
-      }
-    }
-    if (caseOpen && staff && r.video_room) {
-      // wa.me wants a bare country-code number; farmer phones are stored as +91XXXXXXXXXX
-      var waPhone = r.farmer ? String(r.farmer.phone).replace(/\D/g, '') : '';
-      var waText = encodeURIComponent('జనగామ పశు సేవ ' + r.ticket + ': డాక్టర్ వీడియో కాల్‌కి పిలుస్తున్నారు. ఈ లింక్ నొక్కండి — యాప్ అవసరం లేదు:\n' +
-        JITSI + r.video_room + '\n(Doctor video call — tap the link to join, no app needed)');
-      video = '<div class="card">' +
-        '<div class="rowline">' +
-        '<a class="btn small green" href="org.jitsi.meet://meet.jit.si/' + esc(r.video_room) + '">🎥 Open in Jitsi app</a>' +
-        '<a class="btn small ghost" target="_blank" rel="noopener" href="' + JITSI + esc(r.video_room) + '">🌐 Join in browser</a></div>' +
-        (waPhone ? '<div class="rowline">' +
-          '<a class="btn small" style="background:#128C7E" target="_blank" rel="noopener" href="https://wa.me/' + waPhone + '?text=' + waText + '">🟢 Send call link on WhatsApp</a>' +
-          '<a class="btn small ghost" href="tel:' + esc(r.farmer.phone) + '">📞 Ring first</a></div>' +
-          '<p class="hint">Recommended flow: ring the user (a normal call they cannot miss), then send the WhatsApp link — they join straight from the message, without opening this app.</p>' : '') +
-        '<p class="hint">Best experience: <a target="_blank" rel="noopener" href="https://play.google.com/store/apps/details?id=org.jitsi.meet">install the free Jitsi Meet app</a> once and sign in with your Gmail — you stay the call host. In the browser, sign in with Gmail when Jitsi asks.</p></div>';
+    if (caseOpen && !staff && r.vet) {
+      // one button: ask for a video call -> doctor WhatsApp-video-calls the user's number
+      video = '<button class="btn ghost" id="vreq">📹 ' +
+        esc(T('వీడియో కాల్ కావాలి', 'Ask for a video call')) + '</button>' +
+        '<div id="vreqmsg"></div><div style="height:8px"></div>';
     }
     var actions = '';
     if (staff && (r.status === 'NEW' || r.status === 'ASSIGNED' || r.status === 'VISIT_SCHEDULED')) {
@@ -469,7 +445,9 @@ function vTicket(ticket) {
         (r.status === 'NEW'
           ? '<button class="btn" id="claim">Claim this case</button>'
           : '<div class="rowline"><a class="btn small" href="tel:' + esc(r.farmer.phone) + '">📞 Call user</a>' +
-            (r.video_room ? '' : '<button class="btn small green" id="vidbtn">🎥 Start video call</button>') + '</div>' +
+            '<a class="btn small" style="background:#128C7E" target="_blank" rel="noopener" href="https://wa.me/' +
+            esc(String(r.farmer.phone).replace(/\D/g, '')) + '">📹 WhatsApp video call</a></div>' +
+            '<p class="hint">WhatsApp opens on their chat — tap the 📹 icon at the top there. Their phone rings like a normal WhatsApp call.</p>' +
             '<p class="hint">First video call on this phone: Jitsi asks the host to sign in — use your own Gmail, one time only. Users never need an account.</p>' +
             '<label>Observation &amp; diagnosis <span class="en">(required to resolve)</span></label>' +
             '<textarea id="note" maxlength="1000" placeholder="Findings · diagnosis · advice to the user"></textarea>' +
@@ -516,27 +494,18 @@ function vTicket(ticket) {
       api('request.withdraw', { id: r.id }).then(function () { vTicket(ticket); })
         .catch(function (e) { el('wd').disabled = false; alert(e.message); });
     };
-    if (el('vjoin')) el('vjoin').addEventListener('click', function () {
-      api('video.knock', { id: r.id }).catch(function () {});
-    });
     if (el('vreq')) el('vreq').onclick = function () {
       el('vreq').disabled = true;
       api('video.knock', { id: r.id }).then(function () {
         el('vreqmsg').innerHTML = '<div class="ok">' +
-          esc(T('డాక్టర్‌కు తెలియజేశాం — కాల్ మొదలైతే ఇక్కడ బటన్ కనిపిస్తుంది',
-                'Doctor notified — a Join button appears here when the call starts')) + '</div>';
+          esc(T('డాక్టర్‌కు తెలియజేశాం — మీ నంబర్‌కు WhatsApp వీడియో కాల్ వస్తుంది, ఫోన్ దగ్గరే ఉంచుకోండి',
+                'Doctor notified — a WhatsApp video call will come to your number, keep your phone nearby')) + '</div>';
       }).catch(function (e) { el('vreq').disabled = false; alert(e.message); });
     };
     if (staff && el('acts')) {
       if (el('claim')) el('claim').onclick = function () {
         api('vet.claim', { id: r.id }).then(function () { vTicket(ticket); })
           .catch(function (e) { alert(e.message); vTicket(ticket); });
-      };
-      if (el('vidbtn')) el('vidbtn').onclick = function () {
-        el('vidbtn').disabled = true;
-        // create the room only — the refreshed card offers Ring / WhatsApp / app / browser
-        api('vet.videoStart', { id: r.id }).then(function () { vTicket(ticket); })
-          .catch(function (e) { el('vidbtn').disabled = false; alert(e.message); });
       };
       Array.prototype.forEach.call(document.querySelectorAll('#acts [data-a]'), function (b) {
         b.onclick = function () {
