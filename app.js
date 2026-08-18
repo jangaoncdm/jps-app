@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.5.0-M4 b010
+/* JPS app.js — BUILD JPS v0.5.0-M4 b011
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.5.0-M4 b010';
+var BUILD = 'JPS v0.5.0-M4 b011';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', pic:'🐄' }, { v:'buffalo', te:'గేదె', en:'Buffalo', pic:'🐃' },
@@ -122,15 +122,15 @@ function facilityCard(f, title) {
 var installEvt = null;
 window.addEventListener('beforeinstallprompt', function (e) {
   e.preventDefault(); installEvt = e;
-  var bar = document.getElementById('instbar');
-  if (bar) bar.hidden = false;
+  var btn = document.getElementById('instTop');
+  if (btn) btn.hidden = false;
 });
 (function wireInstallBar() {
-  var btn = document.getElementById('instbtn');
+  var btn = document.getElementById('instTop');
   if (btn) btn.onclick = function () {
     if (!installEvt) return;
     installEvt.prompt();
-    installEvt.userChoice.then(function () { document.getElementById('instbar').hidden = true; installEvt = null; });
+    installEvt.userChoice.then(function () { btn.hidden = true; installEvt = null; });
   };
   var standalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
   // WhatsApp/other in-app browsers (Android WebView) cannot install — point to Chrome
