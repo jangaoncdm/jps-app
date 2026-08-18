@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.5.0-M4 b015
+/* JPS app.js — BUILD JPS v0.5.0-M4 b016
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.5.0-M4 b015';
+var BUILD = 'JPS v0.5.0-M4 b016';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', pic:'🐄' }, { v:'buffalo', te:'గేదె', en:'Buffalo', pic:'🐃' },
@@ -576,7 +576,10 @@ function vTips() {
 function staffNav(cur) {
   var items = [['#vet', 'Queue'], ['#att', 'Attendance'], ['#leave', 'Leave'],
                ['#stock', 'Stock'], ['#issues', 'Issues']];
-  if (S.user && S.user.role === 'admin') items.push(['#bcast', 'Broadcasts']);
+  if (S.user && S.user.role === 'admin') {
+    items.unshift(['#admin', 'Dashboard']);
+    items.push(['#bcast', 'Broadcasts']);
+  }
   return '<div class="tabs" style="flex-wrap:wrap">' + items.map(function (i) {
     return '<button data-nav="' + i[0] + '" class="' + (cur === i[0] ? 'on' : '') + '">' + i[1] + '</button>';
   }).join('') + '</div>';
@@ -955,7 +958,7 @@ function vAdmin() {
         '<td>' + badge(r.status) + '</td><td>' + esc(r.mandal) + '</td><td>' + r.minutes_open + ' min</td></tr>';
     }).join('') || '<tr><td colspan="4" class="hint">No open requests</td></tr>';
     render(
-      '<h1>District dashboard</h1>' +
+      '<h1>District dashboard</h1>' + staffNav('#admin') +
       '<div class="stats">' +
       '<div class="stat"><div class="n">' + st.open + '</div><div class="l">Open</div></div>' +
       '<div class="stat"><div class="n">' + st.emergenciesOpen + '</div><div class="l">Emergencies</div></div>' +
@@ -984,8 +987,8 @@ function vAdmin() {
       '<label>Email (used for sign-in)</label><input id="ae" type="email">' +
       '<label>Mobile</label><input id="ap" type="tel" placeholder="9XXXXXXXXX">' +
       '<div style="height:10px"></div><button class="btn small" id="ab">Add vet</button></div>' +
-      '<a class="btn ghost" href="#vet">← Vet console</a>' +
       '<p style="text-align:center"><a href="#" id="lo" class="hint">Logout</a></p>');
+    wireStaffNav();
     el('ab').onclick = function () {
       api('admin.addVet', { name: el('an').value, email: el('ae').value, phone: el('ap').value })
         .then(function (d) {
