@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.5.0-M4 b011
+/* JPS app.js — BUILD JPS v0.5.0-M4 b012
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.5.0-M4 b011';
+var BUILD = 'JPS v0.5.0-M4 b012';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', pic:'🐄' }, { v:'buffalo', te:'గేదె', en:'Buffalo', pic:'🐃' },
@@ -120,18 +120,35 @@ function facilityCard(f, title) {
 }
 // ---------------------------------------------------------------- install prompt + camera
 var installEvt = null;
+function isInstalled() {
+  return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+         window.navigator.standalone === true ||
+         localStorage.getItem('jps_installed') === '1';
+}
 window.addEventListener('beforeinstallprompt', function (e) {
-  e.preventDefault(); installEvt = e;
+  e.preventDefault();
+  if (isInstalled()) return; // already installed — never offer again
+  installEvt = e;
   var btn = document.getElementById('instTop');
   if (btn) btn.hidden = false;
+});
+window.addEventListener('appinstalled', function () {
+  localStorage.setItem('jps_installed', '1');
+  installEvt = null;
+  var btn = document.getElementById('instTop');
+  if (btn) btn.hidden = true;
 });
 (function wireInstallBar() {
   var btn = document.getElementById('instTop');
   if (btn) btn.onclick = function () {
     if (!installEvt) return;
     installEvt.prompt();
-    installEvt.userChoice.then(function () { btn.hidden = true; installEvt = null; });
+    installEvt.userChoice.then(function (c) {
+      if (c && c.outcome === 'accepted') localStorage.setItem('jps_installed', '1');
+      btn.hidden = true; installEvt = null;
+    });
   };
+  if (isInstalled()) { if (btn) btn.hidden = true; }
   var standalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
   // WhatsApp/other in-app browsers (Android WebView) cannot install — point to Chrome
   if (!standalone && / wv\)| WebView|; wv/.test(navigator.userAgent)) {
