@@ -28,8 +28,13 @@ Goal: no manual editor steps ever again; clean data; first real users.
 - [x] First automated deploy shipped b003 incl. video backend — 11/11 live checks
 - [x] Database purged clean (2026-08-17): all test data + photos removed, 9/9 go-live checks pass;
       daily 7 AM job (follow-ups + retention) confirmed scheduled
-- [ ] Pilot rollout — THE ONLY REMAINING STEP: WhatsApp the `SHARE.md` message to field officers of
-      1–2 mandals, print `poster.html` for milk points; review feedback weekly
+- [x] Full-feature browser certification (2026-08-18): 35/35 UI checks across user/doctor/admin on the
+      live system — suite lives at `test/ui-suite.js` (`bash scripts/verify-ui.sh`); evidence in `artifacts/`
+- [ ] Pilot rollout — THE ONLY REMAINING STEP: run `opsPurgeTestData` once (certification re-created
+      test rows), then WhatsApp the `SHARE.md` message to field officers of 1–2 mandals; review weekly
+
+**Pre-launch gate (run before every release):** `bash scripts/verify.sh` (116 backend checks) →
+`bash scripts/deploy-backend.sh && bash scripts/deploy-app.sh` → `bash scripts/verify-ui.sh` (35 browser checks).
 Definition of Done: one command deploys backend + client; live suite green; zero test rows; ≥1 mandal using it.
 
 ## Phase C — Internal staff modules (v0.4.0-M3 b001) ✅ done (19 live checks)
