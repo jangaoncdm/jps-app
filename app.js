@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.5.0-M4 b012
+/* JPS app.js — BUILD JPS v0.5.0-M4 b013
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.5.0-M4 b012';
+var BUILD = 'JPS v0.5.0-M4 b013';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', pic:'🐄' }, { v:'buffalo', te:'గేదె', en:'Buffalo', pic:'🐃' },
@@ -449,15 +449,21 @@ function vTicket(ticket) {
     var svcLine = r.service ? '<p>' + esc(T(r.service.te, r.service.en)) + ' <span class="hint">(' + esc(r.service.code) + ')</span></p>' : '';
     var caseOpen = r.status === 'ASSIGNED' || r.status === 'VISIT_SCHEDULED';
     var video = '';
-    if (caseOpen && !staff && r.vet && r.vet.phone) {
-      // symmetrical with the doctor's side: user can ring or WhatsApp-video-call the doctor directly
-      video = '<div class="rowline">' +
-        '<a class="btn small" href="tel:' + esc(r.vet.phone) + '">📞 ' + esc(T('డాక్టర్‌కు కాల్', 'Call doctor')) + '</a>' +
-        '<a class="btn small" style="background:#128C7E" target="_blank" rel="noopener" href="https://wa.me/' +
-        esc(String(r.vet.phone).replace(/\D/g, '')) + '">📹 ' + esc(T('WhatsApp వీడియో కాల్', 'WhatsApp video call')) + '</a></div>' +
-        '<p class="hint">' + esc(T('WhatsApp తెరుచుకుంటుంది — పైన 📹 గుర్తు నొక్కితే డాక్టర్‌కు కాల్ వెళ్తుంది',
-          'WhatsApp opens on the doctor chat — tap the 📹 icon at the top to ring them')) + '</p>' +
-        '<div style="height:8px"></div>';
+    if (!staff && (r.status === 'NEW' || caseOpen)) {
+      // assigned doctor once claimed; until then the routed centre's in-charge doctor
+      var docPhone = (r.vet && r.vet.phone) ? r.vet.phone : (r.facility && r.facility.mobile) || '';
+      var docLabel = (r.vet && r.vet.phone)
+        ? T('డాక్టర్‌కు కాల్', 'Call doctor')
+        : T('కేంద్రం డాక్టర్‌కు కాల్', 'Call centre doctor');
+      if (docPhone) {
+        video = '<div class="rowline">' +
+          '<a class="btn small" href="tel:' + esc(docPhone) + '">📞 ' + esc(docLabel) + '</a>' +
+          '<a class="btn small" style="background:#128C7E" target="_blank" rel="noopener" href="https://wa.me/' +
+          esc(String(docPhone).replace(/\D/g, '')) + '">📹 ' + esc(T('WhatsApp వీడియో కాల్', 'WhatsApp video call')) + '</a></div>' +
+          '<p class="hint">' + esc(T('WhatsApp తెరుచుకుంటుంది — పైన 📹 గుర్తు నొక్కితే డాక్టర్‌కు కాల్ వెళ్తుంది',
+            'WhatsApp opens on the doctor chat — tap the 📹 icon at the top to ring them')) + '</p>' +
+          '<div style="height:8px"></div>';
+      }
     }
     var actions = '';
     if (staff && (r.status === 'NEW' || r.status === 'ASSIGNED' || r.status === 'VISIT_SCHEDULED')) {
