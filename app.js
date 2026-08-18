@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.5.0-M4 b013
+/* JPS app.js — BUILD JPS v0.5.0-M4 b014
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.5.0-M4 b013';
+var BUILD = 'JPS v0.5.0-M4 b014';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', pic:'🐄' }, { v:'buffalo', te:'గేదె', en:'Buffalo', pic:'🐃' },
@@ -522,9 +522,10 @@ function vTicket(ticket) {
         .catch(function (e) { el('wd').disabled = false; alert(e.message); });
     };
     if (staff && el('acts')) {
+      var onThisTicket = function () { return location.hash === '#t/' + ticket; };
       if (el('claim')) el('claim').onclick = function () {
-        api('vet.claim', { id: r.id }).then(function () { vTicket(ticket); })
-          .catch(function (e) { alert(e.message); vTicket(ticket); });
+        api('vet.claim', { id: r.id }).then(function () { if (onThisTicket()) vTicket(ticket); })
+          .catch(function (e) { alert(e.message); if (onThisTicket()) vTicket(ticket); });
       };
       Array.prototype.forEach.call(document.querySelectorAll('#acts [data-a]'), function (b) {
         b.onclick = function () {
@@ -536,12 +537,12 @@ function vTicket(ticket) {
               visit_slot: (el('vs') || {}).value || '',
               rx_text: (el('rxt') || {}).value || '', tests: (el('tst') || {}).value || '',
               rx_b64: rxb64 || '', rx_mime: 'image/jpeg' });
-          }).then(function () { vTicket(ticket); })
+          }).then(function () { if (onThisTicket()) vTicket(ticket); })
             .catch(function (e) { b.disabled = false; alert(e.message); });
         };
       });
     }
-    startPoll(function () { vTicket(ticket); });
+    startPoll(function () { if (location.hash === '#t/' + ticket) vTicket(ticket); });
   }).catch(function (e) { if (e.code === 'auth') return logout(); render('<div class="err">' + esc(e.message) + '</div>'); });
 }
 
@@ -914,7 +915,11 @@ function vVet(tab) {
     Array.prototype.forEach.call(document.querySelectorAll('[data-claim]'), function (b) {
       b.onclick = function () {
         api('vet.claim', { id: b.getAttribute('data-claim') })
-          .then(function () { vVet('mine'); }).catch(function (e) { alert(e.message); vVet(tab); });
+          .then(function () {
+            // don't repaint the console if the doctor already navigated elsewhere
+            if (location.hash === '' || location.hash === '#vet') vVet('mine');
+          })
+          .catch(function (e) { alert(e.message); if (location.hash === '' || location.hash === '#vet') vVet(tab); });
       };
     });
     el('lo').onclick = function (ev) { ev.preventDefault(); logout(); };
