@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.5.0-M4 b016
+/* JPS app.js — BUILD JPS v0.5.0-M4 b017
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.5.0-M4 b016';
+var BUILD = 'JPS v0.5.0-M4 b017';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', pic:'🐄' }, { v:'buffalo', te:'గేదె', en:'Buffalo', pic:'🐃' },
@@ -597,7 +597,8 @@ function vAttend() {
     var nextIn = !last || last.type === 'out';
     var rows = d.records.map(function (r) {
       var loc = (r.lat && r.lng)
-        ? ' <a target="_blank" rel="noopener" href="' + mapsLink(r.lat, r.lng) + '">📍</a>' : '';
+        ? ' <a target="_blank" rel="noopener" href="' + mapsLink(r.lat, r.lng) + '">📍</a>' +
+          (r.dist_m !== '' && r.dist_m != null ? '<span class="hint"> ' + esc(String(r.dist_m)) + 'm</span>' : '') : '';
       var ph = r.has_photo ? ' <a href="#" data-ph="' + esc(r.id) + '">📷</a>' : '';
       return '<tr><td>' + (r.type === 'in' ? '✅ In' : '🏁 Out') + loc + ph +
         '<div id="phbox-' + esc(r.id) + '"></div></td><td>' + esc(r.at) + '</td></tr>';
@@ -608,7 +609,7 @@ function vAttend() {
       '<video id="cam" class="cam" autoplay playsinline muted></video>' +
       '<div id="campv"></div>' +
       '<div class="rowline" style="justify-content:center"><button class="btn small ghost" id="snap">📸 Capture</button></div>' +
-      '<p class="hint">Your location is captured automatically when you tap the button.</p>' +
+      '<p class="hint">Your location is captured automatically. Staff mapped to a centre must be within 300 m of it to mark attendance.</p>' +
       '<button class="btn ' + (nextIn ? 'green' : 'amber') + '" id="att" disabled>' +
       (nextIn ? '✅ Check in' : '🏁 Check out') + '</button></div>' +
       '<div class="card"><h2>My recent records</h2><table>' + rows + '</table></div>');
