@@ -91,13 +91,26 @@ function TL(te, en) { // label HTML: Telugu with a small English line in 'both'
   return esc(te) + ' <span class="en">' + esc(en) + '</span>';
 }
 
-function api(action, payload) {
+function api(action, payload, _retry) {
   payload = payload || {};
   if (S.token) payload.token = S.token;
   return fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify({ action: action, payload: payload }) })
-    .then(function (r) { return r.json(); })
+    .then(function (r) { return r.text(); })
+    .then(function (txt) {
+      // Right after a backend deploy Apps Script serves a warm-up HTML page instead of
+      // JSON for the first call. Retrying once turns "Cannot reach server" on the first
+      // farmer's screen into a half-second pause.
+      try { return JSON.parse(txt); }
+      catch (e) {
+        if (_retry) throw new Error('Server is waking up. Please try again in a moment.');
+        return new Promise(function (res) { setTimeout(res, 1200); })
+          .then(function () { return api(action, payload, 1); })
+          .then(function (d) { return { ok: true, data: d, rev: S.lastRev, _done: 1 }; });
+      }
+    })
     .then(function (j) {
+      if (j._done) return j.data;
       if (j.rev) S.lastRev = j.rev;
       if (!j.ok) { var e = new Error(j.error.message); e.code = j.error.code; throw e; }
       return j.data;
