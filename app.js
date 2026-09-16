@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.5.0-M4 b017
+/* JPS app.js — BUILD JPS v0.6.0-M5 b002
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.5.0-M4 b017';
+var BUILD = 'JPS v0.6.0-M5 b002';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', pic:'🐄' }, { v:'buffalo', te:'గేదె', en:'Buffalo', pic:'🐃' },
@@ -34,6 +34,21 @@ var EVENT_TE = { CREATED:'అభ్యర్థన నమోదైంది · F
   ESCALATED_1962:'1962/MVCకి పంపారు · Escalated', CANCELLED:'రద్దు · Cancelled',
   PRESCRIPTION:'మందుల చీటీ · Prescription', VIDEO_CALL:'వీడియో కాల్ · Video call' };
 var JITSI = 'https://meet.jit.si/';
+// Dosage vocabulary — mirrors Domain.gs DOSE_FREQ/DOSE_TIMING (the backend is the validator).
+var DOSE_FREQ = [
+  { v:'1-0-0', en:'Once daily (morning)', te:'రోజుకు ఒకసారి (ఉదయం)' },
+  { v:'0-0-1', en:'Once daily (night)',   te:'రోజుకు ఒకసారి (రాత్రి)' },
+  { v:'1-0-1', en:'Twice daily',          te:'రోజుకు రెండుసార్లు' },
+  { v:'1-1-1', en:'Three times daily',    te:'రోజుకు మూడుసార్లు' },
+  { v:'STAT',  en:'Single dose now',      te:'ఇప్పుడు ఒక్కసారి' },
+  { v:'SOS',   en:'Only if needed',       te:'అవసరమైతే మాత్రమే' }
+];
+var DOSE_TIMING = [
+  { v:'after',  en:'After feed',  te:'మేత తర్వాత' },
+  { v:'before', en:'Before feed', te:'మేతకు ముందు' },
+  { v:'any',    en:'Any time',    te:'ఎప్పుడైనా' }
+];
+var RX_ROUTES = ['Oral','IM','IV','SC','Topical','Intramammary','Intrauterine'];
 var SLOTS = [
   { v:'morning', te:'ఉదయం', en:'Morning' },
   { v:'afternoon', te:'మధ్యాహ్నం', en:'Afternoon' },
@@ -50,10 +65,13 @@ function saveAuth(token, user) {
   S.token = token; S.user = user;
   localStorage.setItem('jps_token', token);
   localStorage.setItem('jps_user', JSON.stringify(user));
+  ringPollStart();
 }
 function logout() {
   localStorage.removeItem('jps_token'); localStorage.removeItem('jps_user');
-  S.token = ''; S.user = null; location.hash = '#identify';
+  S.token = ''; S.user = null;
+  ringPollStop(); ringHide(); callClose('');
+  location.hash = '#identify';
 }
 
 // ---------------------------------------------------------------- language
@@ -159,6 +177,194 @@ window.addEventListener('appinstalled', function () {
 var camStream = null;
 function stopCam() {
   if (camStream) { camStream.getTracks().forEach(function (t) { t.stop(); }); camStream = null; }
+}
+
+// ---------------------------------------------------------------- in-app video ring (v0.6)
+// The doctor rings from the case card and this answers it in one tap. No wa.me hop,
+// no room URL is ever shown — the room comes back from the API and goes into an iframe.
+var RG = { poll: null, wait: null, id: null, ctx: null, buzz: null };
+
+function videoHost() { return (S.meta && S.meta.videoHost) || 'meet.jit.si'; }
+function videoUrl(host, room, name) {
+  return 'https://' + (host || videoHost()) + '/' + encodeURIComponent(room) +
+    '#config.prejoinPageEnabled=false&config.disableDeepLinking=true' +
+    '&userInfo.displayName=' + encodeURIComponent('"' + (name || '') + '"');
+}
+
+function ringSound(on) {
+  if (!on) {
+    if (RG.buzz) { clearInterval(RG.buzz); RG.buzz = null; }
+    try { if (navigator.vibrate) navigator.vibrate(0); } catch (e) {}
+    return;
+  }
+  if (RG.buzz) return;
+  var beep = function () {
+    try {
+      if (!RG.ctx) RG.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      if (RG.ctx.state === 'suspended') RG.ctx.resume();
+      var o = RG.ctx.createOscillator(), g = RG.ctx.createGain(), t = RG.ctx.currentTime;
+      o.frequency.value = 880; o.connect(g); g.connect(RG.ctx.destination);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.25, t + 0.05);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.7);
+      o.start(t); o.stop(t + 0.75);
+    } catch (e) {}
+    try { if (navigator.vibrate) navigator.vibrate([400, 180, 400]); } catch (e) {}
+  };
+  beep();
+  RG.buzz = setInterval(beep, 1600);
+}
+
+function ringHide() {
+  ringSound(false);
+  RG.id = null;
+  var b = el('ringbox'); if (b) b.parentNode.removeChild(b);
+}
+
+function ringShow(c) {
+  if (RG.id === c.id && el('ringbox')) return; // already ringing for this case
+  RG.id = c.id;
+  var box = el('ringbox');
+  if (!box) { box = document.createElement('div'); box.id = 'ringbox'; document.body.appendChild(box); }
+  box.innerHTML =
+    '<div class="ringcard">' +
+      '<div class="ringav">\ud83d\udcf9</div>' +
+      '<div class="ringttl">' + esc(T('డాక్టర్ వీడియో కాల్', 'Doctor video call')) + '</div>' +
+      '<div class="ringnm">' + esc(c.vet || T('డాక్టర్', 'Doctor')) + '</div>' +
+      '<div class="ringtk">' + esc(c.ticket || '') + '</div>' +
+      '<div class="ringbtns">' +
+        '<button class="ringbtn no" id="ringno">✖<span>' + esc(T('వద్దు', 'Decline')) + '</span></button>' +
+        '<button class="ringbtn yes" id="ringyes">\ud83d\udcf9<span>' + esc(T('మాట్లాడండి', 'Accept')) + '</span></button>' +
+      '</div></div>';
+  ringSound(true);
+  el('ringyes').onclick = function () {
+    ringSound(false);
+    api('video.answer', { id: c.id }).then(function (v) {
+      ringHide(); callOpen(v.host, v.room, c.id, S.user ? S.user.name : '');
+    }).catch(function (e) { ringHide(); alert(e.message); });
+  };
+  el('ringno').onclick = function () {
+    ringSound(false);
+    api('video.decline', { id: c.id }).catch(function () {});
+    ringHide();
+  };
+}
+
+function callOpen(host, room, id, name) {
+  if (!room) return;
+  var box = el('callbox');
+  if (!box) { box = document.createElement('div'); box.id = 'callbox'; document.body.appendChild(box); }
+  box.innerHTML =
+    '<iframe id="callfr" allow="camera; microphone; fullscreen; display-capture; autoplay" ' +
+      'src="' + esc(videoUrl(host, room, name)) + '"></iframe>' +
+    '<div class="callbar"><span class="callst" id="callst"></span>' +
+      '<button class="btn small red" id="callend">\ud83d\udcf4 ' + esc(T('ముగించు', 'Hang up')) + '</button></div>';
+  el('callend').onclick = function () { callClose(id); };
+}
+
+function callClose(id) {
+  if (RG.wait) { clearInterval(RG.wait); RG.wait = null; }
+  if (id) api('video.end', { id: id }).catch(function () {});
+  var b = el('callbox'); if (b) b.parentNode.removeChild(b);
+}
+
+/** Doctor side: hold "ringing" on the call screen until the user actually picks up. */
+function callWaitForAnswer(id) {
+  if (RG.wait) clearInterval(RG.wait);
+  var st = el('callst');
+  if (st) st.textContent = T('రింగ్ అవుతోంది…', 'Ringing…');
+  RG.wait = setInterval(function () {
+    api('video.state', { id: id }).then(function (v) {
+      var s = el('callst'); if (!s) return;
+      if (v.state === 'active') {
+        s.textContent = T('కనెక్ట్ అయ్యింది', 'Connected');
+        clearInterval(RG.wait); RG.wait = null;
+      } else if (v.state === 'missed' || v.state === 'ended') {
+        s.textContent = T('సమాధానం లేదు', 'No answer');
+        clearInterval(RG.wait); RG.wait = null;
+      }
+    }).catch(function () {});
+  }, 3000);
+}
+
+function ringPollStop() { if (RG.poll) { clearInterval(RG.poll); RG.poll = null; } }
+function ringPollStart() {
+  ringPollStop();
+  if (!S.token || !S.user || S.user.role !== 'farmer') return;
+  RG.poll = setInterval(function () {
+    if (document.hidden) return;                    // no polling (or battery drain) in the background
+    if (el('ringbox') || el('callbox')) return;     // already ringing or already in the call
+    api('video.state', {}).then(function (v) {
+      if (v && v.state === 'ringing') ringShow(v);
+    }).catch(function () {});
+  }, 4000);
+}
+
+// ---------------------------------------------------------------- prescribing (v0.6)
+// One row per medicine, the way Apollo/Practo collect them — plus the two withdrawal
+// fields an Indian veterinary slip needs and a human one does not.
+// Staff names often already read "Dr Srinivas", so don't print "Dr. Dr Srinivas".
+function drName(n) {
+  n = String(n || '').trim();
+  if (!n) return '';
+  return /^dr\.?\s/i.test(n) ? n : 'Dr. ' + n;
+}
+var medSeq = 0;
+function medRowHtml() {
+  var i = ++medSeq;
+  var opts = function (list, sel) {
+    return list.map(function (o) {
+      return '<option value="' + o.v + '"' + (o.v === sel ? ' selected' : '') + '>' +
+        o.v + ' - ' + o.en + '</option>';
+    }).join('');
+  };
+  return '<div class="medrow">' +
+    '<div class="medtop"><span class="medno">' + i + '</span>' +
+      '<input class="m-name" placeholder="Inj. Enrofloxacin 10%" maxlength="120">' +
+      '<button type="button" class="medx" aria-label="Remove medicine">✕</button></div>' +
+    '<div class="medgrid">' +
+      '<input class="m-strength" placeholder="10 ml" maxlength="60">' +
+      '<select class="m-route">' + RX_ROUTES.map(function (r) { return '<option>' + r + '</option>'; }).join('') + '</select>' +
+      '<select class="m-freq">' + opts(DOSE_FREQ, '1-0-1') + '</select>' +
+      '<select class="m-timing">' + opts(DOSE_TIMING, 'after') + '</select>' +
+      '<input class="m-days" type="number" min="0" max="90" placeholder="days">' +
+    '</div>' +
+    '<div class="medgrid wd">' +
+      '<input class="m-milk" type="number" min="0" max="720" placeholder="Milk withhold (hrs)">' +
+      '<input class="m-meat" type="number" min="0" max="120" placeholder="Meat withhold (days)">' +
+    '</div>' +
+    '<label class="wdnone"><input type="checkbox" class="m-wdnone">' +
+      '<span>No withholding needed for this medicine</span></label>' +
+    '<input class="m-note" placeholder="Deep IM, alternate sides" maxlength="160">' +
+    '</div>';
+}
+function addMedRow() {
+  var box = el('meds');
+  if (!box) return;
+  box.insertAdjacentHTML('beforeend', medRowHtml());
+  var row = box.lastElementChild;
+  row.querySelector('.medx').onclick = function () { box.removeChild(row); };
+  var none = row.querySelector('.m-wdnone');
+  none.onchange = function () {
+    ['.m-milk', '.m-meat'].forEach(function (sel) {
+      var f = row.querySelector(sel);
+      f.disabled = none.checked;
+      if (none.checked) f.value = '';
+    });
+  };
+  return row;
+}
+function collectMeds() {
+  var box = el('meds');
+  if (!box) return [];
+  return Array.prototype.map.call(box.querySelectorAll('.medrow'), function (row) {
+    var v = function (sel) { var n = row.querySelector(sel); return n ? n.value : ''; };
+    var cb = row.querySelector('.m-wdnone');
+    return { name: v('.m-name'), strength: v('.m-strength'), route: v('.m-route'),
+             freq: v('.m-freq'), timing: v('.m-timing'), days: v('.m-days'),
+             milk_h: v('.m-milk'), meat_d: v('.m-meat'), note: v('.m-note'),
+             wd_none: cb && cb.checked ? 1 : 0 };
+  }).filter(function (m) { return String(m.name).trim(); });
 }
 
 function stopPoll() { if (S.poll) { clearInterval(S.poll); S.poll = null; } }
@@ -431,32 +637,100 @@ function vTicket(ticket) {
         '<p>' + esc(r.diagnosis) + '</p>' +
         (r.vet ? '<p class="hint">— ' + esc(r.vet.name) + '</p>' : '') + '</div>' : '';
     var rx = (r.prescriptions || []).map(function (p) {
-      var head = '<div style="border-bottom:2px solid var(--brand);padding-bottom:8px;margin-bottom:10px">' +
-        '<div class="hint">పశుసంవర్ధక శాఖ · Veterinary &amp; AH Department, Jangaon</div>' +
-        (p.facility_name ? '<div><b>' + esc(p.facility_name) + '</b></div>' : '') +
-        (p.doctor_name ? '<div>Dr. ' + esc(p.doctor_name) + '</div>' : '') +
-        '<div class="hint">' + esc(p.at) + ' · ' + esc(r.ticket) + ' · ' + esc(spLabel(r.species)) +
-        (r.pashu_tag ? ' · Tag ' + esc(r.pashu_tag) : '') + '</div></div>';
-      var body =
-        (p.observation ? '<p><b>' + esc(T('పరిశీలన', 'Observation')) + ':</b> ' + esc(p.observation) + '</p>' : '') +
-        (p.rx_text ? '<p><b>℞</b></p><p style="white-space:pre-line;border-left:3px solid var(--line);padding-left:10px">' + esc(p.rx_text) + '</p>' : '') +
-        (p.tests ? '<p><b>' + esc(T('పరీక్షలు / సూచనలు', 'Tests / advice')) + ':</b> ' + esc(p.tests) + '</p>' : '') +
+      // Laid out the way an Apollo/Practo e-prescription is: letterhead, prescriber with
+      // council number, patient block, Rx table, advice, then the withdrawal notice -
+      // the one block an Indian veterinary slip carries that a human one does not.
+      var head =
+        '<div class="rxhead">' +
+          '<div class="rxdept">' + esc(T('పశుసంవర్ధక శాఖ', 'Veterinary & Animal Husbandry Dept')) +
+            ' · ' + esc(T('జనగామ జిల్లా', 'Jangaon District')) + '</div>' +
+          (p.facility_name ? '<div class="rxfac">' + esc(p.facility_name) + '</div>' : '') +
+          '<div class="rxdoc"><span>' + esc(drName(p.doctor_name)) + '</span>' +
+            (p.doctor_reg ? '<span class="rxreg">Reg. ' + esc(p.doctor_reg) + '</span>' : '') + '</div>' +
+        '</div>';
+
+      var pt = [];
+      pt.push(['<b>' + esc(T('యజమాని', 'Owner')) + '</b>', esc((r.farmer && r.farmer.name) || (S.user && S.user.name) || '')]);
+      pt.push(['<b>' + esc(T('జంతువు', 'Animal')) + '</b>', esc(spLabel(r.species)) + (r.pashu_tag ? ' · Tag ' + esc(r.pashu_tag) : '')]);
+      if (p.weight_kg) pt.push(['<b>' + esc(T('బరువు', 'Weight')) + '</b>', esc(p.weight_kg) + ' kg']);
+      if (p.temp_c) pt.push(['<b>' + esc(T('ఉష్ణోగ్రత', 'Temp')) + '</b>', esc(p.temp_c) + ' °C']);
+      var ptBlock = '<div class="rxpt">' + pt.map(function (x) {
+        return '<div><span>' + x[0] + '</span><span>' + x[1] + '</span></div>'; }).join('') + '</div>';
+
+      var meds = (p.meds || []).length
+        ? '<table class="rxtab"><thead><tr><th>#</th><th>' + esc(T('మందు', 'Medicine')) + '</th>' +
+            '<th>' + esc(T('మోతాదు', 'Dosage')) + '</th></tr></thead><tbody>' +
+          p.meds.map(function (m, i) {
+            var fq = DOSE_FREQ.filter(function (f) { return f.v === m.freq; })[0];
+            var tm = DOSE_TIMING.filter(function (t) { return t.v === m.timing; })[0];
+            return '<tr><td class="rxn">' + (i + 1) + '</td>' +
+              '<td><b>' + esc(m.name) + '</b>' +
+                (m.strength ? '<div class="rxsub">' + esc(m.strength) +
+                  (m.route && m.route !== 'Oral' ? ' · ' + esc(m.route) : '') + '</div>' : '') +
+                (m.note ? '<div class="rxsub">' + esc(m.note) + '</div>' : '') + '</td>' +
+              '<td><b class="rxfreq">' + esc(m.freq) + '</b>' +
+                (fq ? '<div class="rxsub">' + esc(T(fq.te, fq.en)) + '</div>' : '') +
+                (m.days ? '<div class="rxsub">' + m.days + ' ' + esc(T('రోజులు', 'days')) + '</div>' : '') +
+                (tm && m.timing !== 'any' ? '<div class="rxsub">' + esc(T(tm.te, tm.en)) + '</div>' : '') +
+              '</td></tr>';
+          }).join('') + '</tbody></table>'
+        : (p.rx_text ? '<p class="rxpre">' + esc(p.rx_text) + '</p>' : '');
+
+      // Food-chain safety. Loud on purpose: milk sold inside this window is a residue violation.
+      var wd = '';
+      if (p.withdraw_milk_h || p.withdraw_meat_d) {
+        var parts = [];
+        if (p.withdraw_milk_h) parts.push('<div><span class="wdno">' + p.withdraw_milk_h + ' ' +
+          esc(T('గంటలు', 'hours')) + '</span>' + esc(T('పాలు వాడవద్దు / అమ్మవద్దు', 'Do not use or sell milk')) + '</div>');
+        if (p.withdraw_meat_d) parts.push('<div><span class="wdno">' + p.withdraw_meat_d + ' ' +
+          esc(T('రోజులు', 'days')) + '</span>' + esc(T('మాంసానికి పంపవద్దు', 'Do not send for meat')) + '</div>');
+        wd = '<div class="rxwd"><div class="wdttl">⚠️ ' +
+          esc(T('ఔషధ విరమణ కాలం', 'Withdrawal period')) + '</div>' + parts.join('') +
+          '<div class="wdfoot">' + esc(T('చివరి మోతాదు నుంచి లెక్కించండి',
+            'Counted from the last dose given')) + '</div></div>';
+      }
+
+      var body = ptBlock +
+        (p.observation ? '<div class="rxsec"><h3>' + esc(T('నిర్ధారణ', 'Diagnosis')) + '</h3><p>' + esc(p.observation) + '</p></div>' : '') +
+        (meds ? '<div class="rxsec"><h3>Rx · ' + esc(T('మందులు', 'Medicines')) + '</h3>' + meds + '</div>' : '') +
+        wd +
+        (p.advice ? '<div class="rxsec"><h3>' + esc(T('సలహా', 'Advice')) + '</h3><p>' + esc(p.advice) + '</p></div>' : '') +
+        (p.tests ? '<div class="rxsec"><h3>' + esc(T('పరీక్షలు', 'Tests')) + '</h3><p>' + esc(p.tests) + '</p></div>' : '') +
+        (p.followup_date ? '<div class="rxsec"><h3>' + esc(T('మళ్లీ చూపించండి', 'Follow-up')) + '</h3><p>' + esc(p.followup_date) + '</p></div>' : '') +
         (p.photo ? '<img class="ph" src="data:' + esc(p.photo.mime) + ';base64,' + p.photo.b64 + '">' : '');
-      return '<div class="card"><h2>💊 ' + TL('మందుల చీటీ', 'Prescription') + '</h2>' + head + body +
+
+      var foot = '<div class="rxfoot">' +
+        '<div>' + esc(T('డిజిటల్‌గా జారీ చేయబడింది — సంతకం అవసరం లేదు',
+          'Issued electronically — valid without a physical signature')) + '</div>' +
+        '<div class="rxmeta"><span>' + esc(p.rx_no || '') + '</span><span>' + esc(p.at) + '</span>' +
+          '<span>' + esc(r.ticket) + '</span></div></div>';
+
+      return '<div class="card rxcard">' + head + body + foot +
         '<div class="rowline"><button class="btn small ghost" onclick="window.print()">🖨️ ' +
         esc(T('ప్రింట్ / సేవ్', 'Print / save')) + '</button></div></div>';
     }).join('');
     var svcLine = r.service ? '<p>' + esc(T(r.service.te, r.service.en)) + ' <span class="hint">(' + esc(r.service.code) + ')</span></p>' : '';
     var caseOpen = r.status === 'ASSIGNED' || r.status === 'VISIT_SCHEDULED';
     var video = '';
-    if (!staff && (r.status === 'NEW' || caseOpen)) {
+    if (!staff && (r.status === 'NEW' || caseOpen || r.status === 'ESCALATED')) {
       // assigned doctor once claimed; until then the routed centre's in-charge doctor
       var docPhone = (r.vet && r.vet.phone) ? r.vet.phone : (r.facility && r.facility.mobile) || '';
       var docLabel = (r.vet && r.vet.phone)
         ? T('డాక్టర్‌కు కాల్', 'Call doctor')
         : T('కేంద్రం డాక్టర్‌కు కాల్', 'Call centre doctor');
+      // An escalated case is exactly when 1962 matters most - don't send them back home for it.
+      if (r.status === 'ESCALATED') {
+        video += '<div class="tip warn"><b>' + esc(T('1962 / MVC బృందం సంప్రదిస్తారు',
+          'The 1962 / MVC team will contact you')) + '</b></div>' +
+          '<a class="btn red" href="tel:1962">🚑 ' + esc(T('1962కి కాల్ చేయండి', 'Call 1962 now')) + '</a>' +
+          '<div style="height:8px"></div>';
+      }
+      if (r.video_state === 'active') {
+        video += '<div class="rowline"><button class="btn vcall" id="rejoin">📹 ' +
+          esc(T('వీడియో కాల్‌లో చేరండి', 'Rejoin the video call')) + '</button></div>';
+      }
       if (docPhone) {
-        video = '<div class="rowline">' +
+        video += '<div class="rowline">' +
           '<a class="btn small" href="tel:' + esc(docPhone) + '">📞 ' + esc(docLabel) + '</a>' +
           '<a class="btn small" style="background:#128C7E" target="_blank" rel="noopener" href="https://wa.me/' +
           esc(String(docPhone).replace(/\D/g, '')) + '">📹 ' + esc(T('WhatsApp వీడియో కాల్', 'WhatsApp video call')) + '</a></div>' +
@@ -471,20 +745,27 @@ function vTicket(ticket) {
       actions = '<div class="card" id="acts">' +
         (r.status === 'NEW'
           ? '<button class="btn" id="claim">Claim this case</button>'
-          : '<div class="rowline"><a class="btn small" href="tel:' + esc(r.farmer.phone) + '">📞 Call user</a>' +
-            '<a class="btn small" style="background:#128C7E" target="_blank" rel="noopener" href="https://wa.me/' +
-            esc(String(r.farmer.phone).replace(/\D/g, '')) + '">📹 WhatsApp video call</a></div>' +
-            '<p class="hint">WhatsApp opens on their chat — tap the 📹 icon at the top there. Their phone rings like a normal WhatsApp call.</p>' +
-            '<p class="hint">First video call on this phone: Jitsi asks the host to sign in — use your own Gmail, one time only. Users never need an account.</p>' +
+          : '<div class="rowline"><button class="btn small vcall" id="vcall">📹 Video call</button>' +
+            '<a class="btn small" href="tel:' + esc(r.farmer.phone) + '">📞 Call user</a></div>' +
+            '<p class="hint">Video call rings them inside the app — they tap once to answer. No WhatsApp needed.</p>' +
+            '<div class="rowline"><a class="btn small ghost" target="_blank" rel="noopener" href="https://wa.me/' +
+            esc(String(r.farmer.phone).replace(/\D/g, '')) + '">💬 WhatsApp instead</a></div>' +
+            '<p class="hint">Fallback only — use it if the in-app ring goes unanswered (phone off, or app not installed).</p>' +
             '<label>Observation &amp; diagnosis <span class="en">(required to resolve)</span></label>' +
             '<textarea id="note" maxlength="1000" placeholder="Findings · diagnosis · advice to the user"></textarea>' +
-            '<label>Medicines — Rx <span class="en">(one per line; auto-becomes a prescription)</span></label>' +
-            '<textarea id="rxt" maxlength="1000" placeholder="Inj. ... dose · route · days&#10;Bolus ... "></textarea>' +
-            '<label>Tests / further advice <span class="en">(optional)</span></label>' +
+            '<div class="rowline2"><div><label>Weight (kg)</label><input id="wkg" type="number" inputmode="decimal" min="0" max="2000" placeholder="410"></div>' +
+            '<div><label>Temp (&deg;C)</label><input id="tpc" type="number" inputmode="decimal" min="30" max="45" step="0.1" placeholder="39.8"></div></div>' +
+            '<label>Medicines &mdash; Rx</label>' +
+            '<div id="meds"></div>' +
+            '<div class="rowline"><button class="btn small ghost" id="addmed" type="button">+ Add medicine</button></div>' +
+            '<label>Advice to the owner <span class="en">(printed on the slip)</span></label>' +
+            '<textarea id="adv" maxlength="600" placeholder="Strip the quarter fully before each dose. Keep bedding dry."></textarea>' +
+            '<label>Tests <span class="en">(optional)</span></label>' +
             '<textarea id="tst" maxlength="1000" placeholder="Blood smear · milk culture · revisit if ..."></textarea>' +
+            '<label>Follow-up date <span class="en">(optional)</span></label><input id="fud" type="date">' +
             '<label>Prescription photo (optional)</label>' +
             '<input id="rxf" type="file" accept="image/*" capture="environment">' +
-            '<p class="hint">Anything written in Rx or Tests is issued as a formal prescription with your name, centre and time.</p>' +
+            '<p class="hint">Medicines, advice or tests are issued as a formal prescription with your name, registration number, centre and time.</p>' +
             '<div class="rowline"><button class="btn small ghost" data-a="log_call">Log call</button></div>' +
             '<h2>Disposition</h2><div class="rowline">' +
             '<button class="btn small green" data-a="green">GREEN close</button>' +
@@ -515,6 +796,12 @@ function vTicket(ticket) {
           esc(T('అభ్యర్థన రద్దు చేయండి', 'Withdraw this request')) + '</button><div style="height:8px"></div>'
         : '') +
       '<a class="btn ghost" href="' + (staff ? '#vet' : '#home') + '">← ' + (staff ? 'Queue' : esc(T('హోమ్', 'Home'))) + '</a>');
+    if (el('rejoin')) el('rejoin').onclick = function () {
+      api('video.state', { id: r.id }).then(function (v) {
+        if (v.state === 'active' || v.state === 'ringing') callOpen(v.host, v.room, r.id, S.user ? S.user.name : '');
+        else alert(T('ఆ కాల్ ముగిసింది', 'That call has ended'));
+      }).catch(function (e) { alert(e.message); });
+    };
     if (el('wd')) el('wd').onclick = function () {
       if (!confirm(T('ఖచ్చితంగా రద్దు చేయాలా? ఇది వెనక్కి తీసుకోలేరు.', 'Withdraw this request? This cannot be undone.'))) return;
       el('wd').disabled = true;
@@ -523,6 +810,18 @@ function vTicket(ticket) {
     };
     if (staff && el('acts')) {
       var onThisTicket = function () { return location.hash === '#t/' + ticket; };
+      if (el('addmed')) {
+        el('addmed').onclick = function () { addMedRow(); };
+        addMedRow(); // start with one row so the doctor can just type
+      }
+      if (el('vcall')) el('vcall').onclick = function () {
+        el('vcall').disabled = true;
+        api('vet.videoStart', { id: r.id }).then(function (v) {
+          el('vcall').disabled = false;
+          callOpen(v.host, v.room, r.id, S.user ? S.user.name : 'Doctor');
+          callWaitForAnswer(r.id); // hold 'Ringing...' until they actually pick up
+        }).catch(function (e) { el('vcall').disabled = false; alert(e.message); });
+      };
       if (el('claim')) el('claim').onclick = function () {
         api('vet.claim', { id: r.id }).then(function () { if (onThisTicket()) vTicket(ticket); })
           .catch(function (e) { alert(e.message); if (onThisTicket()) vTicket(ticket); });
@@ -535,7 +834,10 @@ function vTicket(ticket) {
             return api('vet.act', { id: r.id, action: b.getAttribute('data-a'),
               note: (el('note') || {}).value || '', visit_date: (el('vd') || {}).value || '',
               visit_slot: (el('vs') || {}).value || '',
-              rx_text: (el('rxt') || {}).value || '', tests: (el('tst') || {}).value || '',
+              meds: collectMeds(), advice: (el('adv') || {}).value || '',
+              followup_date: (el('fud') || {}).value || '',
+              weight_kg: (el('wkg') || {}).value || '', temp_c: (el('tpc') || {}).value || '',
+              tests: (el('tst') || {}).value || '',
               rx_b64: rxb64 || '', rx_mime: 'image/jpeg' });
           }).then(function () { if (onThisTicket()) vTicket(ticket); })
             .catch(function (e) { b.disabled = false; alert(e.message); });
@@ -895,6 +1197,12 @@ function vVet(tab) {
     render(
       '<h1>Vet duty console <span class="hint">' + esc(S.user.name) + '</span></h1>' +
       staffNav('#vet') + alerts +
+      // The council number prints on every prescription, so nag until it is set - once.
+      (S.user.reg_no ? '' :
+        '<div class="tip warn"><b>Add your registration number</b>' +
+        '<div class="hint">It is printed on every prescription you issue. State Veterinary Council number.</div>' +
+        '<div class="rowline" style="margin-top:8px"><input id="regno" placeholder="TSVC/2019/4471" maxlength="40" style="margin:0">' +
+        '<button class="btn small" id="regsave">Save</button></div></div>') +
       '<div class="rowline"><button class="btn small ' + (q.on_call ? 'green' : 'amber') + '" id="avbtn">' +
       (q.on_call ? '🟢 On call — tap to go off' : '🟠 Off call — tap to go on') + '</button></div>' +
       '<p class="hint">' + (q.jurisdiction && q.jurisdiction.length
@@ -909,6 +1217,16 @@ function vVet(tab) {
       (S.user.role === 'admin' ? '<a class="btn ghost" href="#admin">Admin dashboard →</a>' : '') +
       '<p style="text-align:center"><a href="#" id="lo" class="hint">Logout</a></p>');
     wireStaffNav();
+    if (el('regsave')) el('regsave').onclick = function () {
+      var v = el('regno').value.trim();
+      if (!v) return;
+      el('regsave').disabled = true;
+      api('staff.profile', { reg_no: v }).then(function (d) {
+        S.user.reg_no = d.reg_no;
+        localStorage.setItem('jps_user', JSON.stringify(S.user));
+        vVet(tab);
+      }).catch(function (e) { el('regsave').disabled = false; alert(e.message); });
+    };
     el('avbtn').onclick = function () {
       api('staff.availability', { on: q.on_call ? 0 : 1 }).then(function () { vVet(tab); })
         .catch(function (e) { alert(e.message); });
@@ -1035,6 +1353,7 @@ api('meta.info', {}).then(function (m) {
       : (S.user.role === 'admin' ? (location.hash || '#admin') : (location.hash || '#vet'));
     route();
     tryRegisterPush();
+    ringPollStart();
   } else {
     location.hash = location.hash === '#staff' ? '#staff' : '#identify';
     route();
