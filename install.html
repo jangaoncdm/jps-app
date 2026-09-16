@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="te">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>జనగామ పశు సేవ — Install</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#312E81">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<script>
+/* Capture the install event as early as possible — Chrome can fire it before the
+   rest of the page parses, and a missed event means a lost one-tap install. */
+window.__jpsEvt = null;
+window.addEventListener('beforeinstallprompt', function (e) {
+  e.preventDefault(); window.__jpsEvt = e;
+  if (window.__jpsReady) window.__jpsReady();
+});
+</script>
+<style>
+*{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
+body{font-family:"Noto Sans Telugu","Noto Sans",system-ui,sans-serif;min-height:100vh;
+background:linear-gradient(160deg,#1E1B4B 0%,#312E81 45%,#4C1D95 100%);color:#fff;
+display:flex;flex-direction:column;align-items:center;justify-content:center;
+padding:24px 20px;text-align:center;gap:18px}
+.logo{width:88px;height:88px;border-radius:22px;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+h1{font-size:27px;line-height:1.3;font-weight:800}
+h1 .en{display:block;font-size:15px;font-weight:600;color:#C7C5E8;margin-top:4px}
+.sub{font-size:16px;color:#DDDCF2;line-height:1.5;max-width:22rem}
+.grp{display:flex;flex-direction:column;align-items:center;gap:14px;width:100%}
+.big{width:100%;max-width:22rem;border:0;border-radius:18px;padding:20px 18px;
+font-size:21px;font-weight:800;font-family:inherit;cursor:pointer;color:#1E1B4B;
+background:linear-gradient(135deg,#5EEAD4,#FCD34D);box-shadow:0 10px 28px rgba(94,234,212,.35);
+animation:pulse 1.9s ease-in-out infinite}
+.big .en{display:block;font-size:13.5px;font-weight:700;color:#3730A3;margin-top:3px}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.035)}}
+@media (prefers-reduced-motion:reduce){.big{animation:none}}
+.ghost{display:inline-block;text-decoration:none;border:2px solid rgba(255,255,255,.4);
+border-radius:14px;padding:13px 20px;font-size:16px;font-weight:700;color:#fff;
+background:rgba(255,255,255,.08);font-family:inherit;cursor:pointer}
+.card{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);border-radius:16px;
+padding:16px 18px;font-size:15px;line-height:1.65;max-width:22rem;text-align:left}
+.card b{color:#FCD34D}
+.card .en{color:#C7C5E8;font-size:13px;display:block;margin-top:8px}
+.emg{background:#B91C1C;border-radius:14px;padding:12px 18px;font-size:16px;font-weight:800;
+max-width:22rem;width:100%}
+.emg a{color:#fff}
+.foot{font-size:12.5px;color:#A9A7CE;line-height:1.6;max-width:24rem}
+.spin{width:26px;height:26px;border:3px solid rgba(255,255,255,.25);border-top-color:#5EEAD4;
+border-radius:50%;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<img class="logo" src="icon-192.png" alt="">
+<h1>జనగామ పశు సేవ<span class="en">Jangaon Pashu Seva · Government veterinary doctor-on-call</span></h1>
+
+<!-- A: still working out what this device can do -->
+<div id="wait"><div class="spin"></div></div>
+
+<!-- B: Chrome / Android — one tap installs -->
+<div id="can" class="grp" hidden>
+  <p class="sub">యాప్ ఇన్‌స్టాల్ చేయడానికి కింద నొక్కండి — ఒక్క నొక్కు చాలు.</p>
+  <button class="big" id="go">📲 ఇన్‌స్టాల్ చేయండి<span class="en">Tap to install the app</span></button>
+</div>
+
+<!-- C: in-app browser (WhatsApp etc.) — jump straight to Chrome -->
+<div id="wv" class="grp" hidden>
+  <p class="sub">WhatsApp లోపలి బ్రౌజర్‌లో ఇన్‌స్టాల్ కుదరదు. Chrome లో తెరవడానికి నొక్కండి.</p>
+  <button class="big" id="chrome">🌐 Chrome లో తెరవండి<span class="en">Open in Chrome, then tap Install</span></button>
+</div>
+
+<!-- D: iPhone -->
+<div id="ios" class="grp" hidden>
+  <div class="card">iPhone లో ఇన్‌స్టాల్:<br>1. కింద <b>Share ⬆️</b> నొక్కండి<br>
+  2. <b>Add to Home Screen</b> ఎంచుకోండి<br>3. <b>Add</b> నొక్కండి
+  <span class="en">Use Safari: Share → Add to Home Screen → Add</span></div>
+  <a class="ghost" href="./">యాప్ తెరవండి · Open the app</a>
+</div>
+
+<!-- E: anything else -->
+<div id="alt" class="grp" hidden>
+  <div class="card">బ్రౌజర్ మెనూ <b>⋮</b> → <b>Install app</b> / <b>Add to Home screen</b> నొక్కండి.
+  <span class="en">Browser menu ⋮ → Install app / Add to Home screen</span></div>
+  <a class="ghost" href="./">యాప్ తెరవండి · Open the app</a>
+</div>
+
+<!-- F: already installed -->
+<div id="done" class="grp" hidden>
+  <p class="sub">✅ యాప్ ఇప్పటికే ఇన్‌స్టాల్ అయ్యింది.</p>
+  <a class="ghost" href="./">యాప్ తెరవండి · Open the app</a>
+</div>
+
+<div class="emg">🚑 అత్యవసరమా? నేరుగా <a href="tel:1962">1962</a> కి కాల్ చేయండి</div>
+<p class="foot">ఉచిత ప్రభుత్వ సేవ · పశుసంవర్ధక శాఖ, జనగామ జిల్లా<br>
+Free government service · Veterinary &amp; Animal Husbandry Department, Jangaon District</p>
+
+<script>
+(function () {
+  var ua = navigator.userAgent;
+  var PANES = ['wait', 'can', 'wv', 'ios', 'alt', 'done'];
+  function show(id) {
+    for (var i = 0; i < PANES.length; i++) {
+      var el = document.getElementById(PANES[i]);
+      if (el) el.hidden = (PANES[i] !== id);
+    }
+  }
+  function stored(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function remember(k) { try { localStorage.setItem(k, '1'); } catch (e) {} }
+
+  var installed = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+                  window.navigator.standalone === true ||
+                  stored('jps_installed') === '1';
+  if (installed) {
+    show('done');
+    setTimeout(function () { location.replace('./'); }, 1500);
+    return;
+  }
+
+  // Chrome only treats the site as installable once a service worker is registered.
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js')['catch'](function () {});
+
+  var isIOS = /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  var inApp = / wv\)| WebView|; wv|FBAN|FBAV|Instagram|Line\//.test(ua);
+  var isAndroid = /Android/.test(ua);
+
+  document.getElementById('go').onclick = function () {
+    var e = window.__jpsEvt;
+    if (!e) { show('alt'); return; }
+    e.prompt();
+    e.userChoice.then(function (c) {
+      if (c && c.outcome === 'accepted') remember('jps_installed');
+    });
+  };
+
+  // The event may already be waiting, or land a moment after this runs.
+  window.__jpsReady = function () { show('can'); };
+  if (window.__jpsEvt) show('can');
+
+  if (inApp && isAndroid) {
+    show('wv');
+    document.getElementById('chrome').onclick = function () {
+      location.href = 'intent://' + location.host + location.pathname +
+        '#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=' +
+        encodeURIComponent(location.href) + ';end';
+    };
+  } else if (isIOS) {
+    show('ios');
+  } else {
+    // Give Chrome a moment to fire beforeinstallprompt before falling back.
+    setTimeout(function () { if (!window.__jpsEvt) show('alt'); }, 2600);
+  }
+
+  window.addEventListener('appinstalled', function () {
+    remember('jps_installed');
+    show('done');
+    setTimeout(function () { location.replace('./'); }, 1200);
+  });
+})();
+</script>
+</body>
+</html>
