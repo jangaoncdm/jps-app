@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.6.0-M5 b006
+/* JPS app.js — BUILD JPS v0.6.0-M5 b007
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.6.0-M5 b006';
+var BUILD = 'JPS v0.6.0-M5 b007';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', pic:'🐄' }, { v:'buffalo', te:'గేదె', en:'Buffalo', pic:'🐃' },
@@ -383,30 +383,44 @@ function wireLangChips(rerender) {
 function vIdentify(msg) {
   stopPoll();
   render(
+    '<div class="signin">' +
+      '<div class="si-mark"><img src="icon-192.png" alt=""></div>' +
+      '<h1>' + esc(T('పశువుకు వైద్య సహాయం ఒక్క ట్యాప్ దూరం',
+        'Veterinary help for your animal, one tap away')) + '</h1>' +
+      '<p class="si-sub">' + esc(T('ప్రభుత్వ పశు వైద్యం · పూర్తిగా ఉచితం',
+        'Government veterinary care · completely free')) + '</p>' +
+    '</div>' +
     (msg ? '<div class="err">' + esc(msg) + '</div>' : '') +
+    '<div class="card">' +
+      '<button class="btn" id="hintbtn">📱 ' +
+        esc(T('నా నంబర్‌తో కొనసాగండి', 'Continue with my number')) + '</button>' +
+      '<div class="orline"><span>' + esc(T('లేదా', 'or')) + '</span></div>' +
+      '<label style="margin-top:0">' + TL('మొబైల్ నంబర్', 'Mobile number') + '</label>' +
+      '<input id="ph" type="tel" inputmode="numeric" placeholder="9XXXXXXXXX">' +
+      '<label>' + TL('మీ పేరు', 'Your name') + '</label>' +
+      '<input id="nm" type="text" maxlength="80">' +
+      '<div style="height:14px"></div>' +
+      '<button class="btn ghost" id="manbtn">' + esc(T('కొనసాగండి', 'Continue')) + '</button>' +
+      '<p class="en" style="text-align:center;margin-top:10px">' +
+        esc(T('OTP అవసరం లేదు · పాస్‌వర్డ్ లేదు', 'No OTP, no password')) + '</p>' +
+    '</div>' +
+    '<a class="sosbar" href="tel:1962">' +
+      '<span class="sb-ic">🚑</span>' +
+      '<span><b>' + esc(T('అత్యవసరమా? 1962', 'Emergency? Call 1962')) + '</b>' +
+      '<span class="hint">' + esc(T('24 గంటలూ ఉచిత సహాయం', 'Free state helpline, 24 hours')) + '</span></span></a>' +
     '<div class="card"><label style="margin-top:0">' + TL('భాష', 'Language') + '</label>' + langChips() + '</div>' +
-    '<div class="card" style="text-align:center">' +
-    '<h1>' + esc(T('పశువుకు వైద్య సహాయం', 'Animal health help')) + '</h1>' +
-    '<p class="hint">' + esc(T('డాక్టర్ మీకు తిరిగి కాల్ చేస్తారు', 'Doctor-on-call — a vet calls you back.')) + '</p>' +
-    '<div style="height:10px"></div>' +
-    '<button class="btn" id="hintbtn">📱 ' + esc(T('నా నంబర్‌తో కొనసాగండి', 'Continue with my number')) + '</button>' +
-    '<div style="height:8px"></div>' +
-    '<a class="btn red" href="tel:1962">🚑 ' + esc(T('అత్యవసరం? 1962', 'Emergency? 1962')) + '</a></div>' +
-    '<div class="card"><h2>' + TL('నంబర్ టైప్ చేయండి', 'Or type your number') + '</h2>' +
-    '<label>' + TL('మొబైల్ నంబర్', 'Mobile') + '</label>' +
-    '<input id="ph" type="tel" inputmode="numeric" placeholder="9XXXXXXXXX">' +
-    '<label>' + TL('మీ పేరు', 'Name') + '</label>' +
-    '<input id="nm" type="text" maxlength="80">' +
-    '<div style="height:10px"></div><button class="btn ghost" id="manbtn">' + esc(T('కొనసాగండి', 'Continue')) + '</button>' +
-    '<p class="hint" style="margin-top:10px"><a href="#staff">Staff sign-in →</a></p></div>'
+    '<p class="hint" style="text-align:center"><a href="#staff">' +
+      esc(T('సిబ్బంది ప్రవేశం', 'Staff sign-in')) + ' →</a></p>'
   );
   wireLangChips(function () { vIdentify(msg); });
   el('hintbtn').onclick = function () {
-    el('hintbtn').disabled = true;
+    el('hintbtn').classList.add('busy');
     tryPhoneHint().then(function (phone) {
-      if (!phone) { el('hintbtn').disabled = false;
+      if (!phone) {
+        el('hintbtn').classList.remove('busy');
         el('ph').focus();
-        return alert(T('ఈ ఫోన్‌లో నంబర్ కనబడలేదు — దయచేసి టైప్ చేయండి', 'Number picker unavailable — please type it'));
+        return toast(T('నంబర్ కనబడలేదు — టైప్ చేయండి',
+          'Number picker unavailable — please type it'));
       }
       identify(phone, '', 'hint');
     });
@@ -973,32 +987,46 @@ function vCentre() {
 }
 
 function vTips() {
-  function tip(cls, te, en) {
-    return '<div class="tip' + (cls ? ' ' + cls : '') + '">' + TL(te, en) + '</div>';
-  }
+  var row = function (icon, te, en, bad) {
+    return '<div class="tiprow' + (bad ? ' bad' : '') + '"><span class="ti">' + icon + '</span>' +
+      '<div>' + TL(te, en) + '</div></div>';
+  };
   render(
-    '<div class="card"><h1>📗 ' + TL('పశు సంరక్షణ — సూచనలు', "Animal care — do's & don'ts") + '</h1>' +
-    '<p class="hint">' + esc(T('జనగామ పశు వైద్య శాఖ సాధారణ సూచనలు. అనారోగ్యం తీవ్రంగా ఉంటే వెంటనే 1962కి కాల్ చేయండి.',
-      'General guidance from the Jangaon Veterinary Department. If the animal is seriously ill, call 1962 immediately.')) + '</p></div>' +
-    '<div class="card"><h2>✅ ' + TL('చేయవలసినవి', 'Do') + '</h2>' +
-    tip('', 'పశువులకు ఎప్పుడూ శుభ్రమైన తాగునీరు అందుబాటులో ఉంచండి', 'Keep clean drinking water available at all times') +
-    tip('', 'ప్రభుత్వ టీకాలు (గాలికుంటు, గొంతువాపు) సకాలంలో వేయించండి — ఉచితం', 'Get government vaccinations (FMD, HS/BQ) on schedule — they are free') +
-    tip('', 'సంవత్సరానికి కనీసం రెండుసార్లు నట్టల మందు వేయించండి', 'Deworm at least twice a year') +
-    tip('', 'పాలు పితికే ముందు, తర్వాత పొదుగును శుభ్రంగా కడగండి', 'Wash the udder before and after milking') +
-    tip('', 'చెవి ట్యాగ్ నంబర్ భద్రంగా నోట్ చేసుకోండి — వైద్యానికి, బీమాకు అవసరం', 'Note the ear-tag number safely — needed for treatment and insurance') +
-    tip('', 'కొత్త పశువును మందలో కలిపే ముందు వారం రోజులు విడిగా ఉంచండి', 'Keep newly bought animals separate for a week before mixing with the herd') +
-    '</div>' +
-    '<div class="card"><h2>❌ ' + TL('చేయకూడనివి', "Don't") + '</h2>' +
-    tip('warn', 'డాక్టర్ సూచన లేకుండా సొంతంగా యాంటీబయాటిక్ ఇంజెక్షన్లు ఇవ్వకండి', 'Do not give antibiotic injections on your own without a doctor\'s advice') +
-    tip('warn', 'పురుగుమందు చల్లిన పొలాల్లో వెంటనే మేపకండి', 'Do not graze animals in freshly pesticide-sprayed fields') +
-    tip('warn', 'ఈత కష్టమైనప్పుడు బలవంతంగా లాగవద్దు — వెంటనే డాక్టర్‌ను పిలవండి', 'Do not pull the calf by force in difficult delivery — call the doctor at once') +
-    tip('warn', 'ప్లాస్టిక్ కవర్లు, పాడైన మేత పశువులకు పెట్టవద్దు', 'Do not let animals eat plastic covers or spoiled feed') +
-    tip('warn', 'పాము కాటుకు నాటు వైద్యం మీద ఆధారపడవద్దు — 1962కి కాల్ చేయండి', 'Do not rely on folk remedies for snake bite — call 1962') +
-    '</div>' +
-    '<a class="btn ghost" href="#home">← ' + esc(T('హోమ్', 'Home')) + '</a>');
-}
+    '<h1>' + TL('పశు సంరక్షణ', 'Animal care') + '</h1>' +
+    '<p class="hint" style="margin:6px 0 14px">' +
+      esc(T('జనగామ పశు వైద్య శాఖ సాధారణ సూచనలు. తీవ్రంగా అనారోగ్యంగా ఉంటే 1962కి కాల్ చేయండి.',
+        'General guidance from the Jangaon Veterinary Department. If the animal is seriously ill, call 1962.')) + '</p>' +
 
-// ---------------------------------------------------------------- staff modules (v0.4, English-only)
+    '<div class="card"><h2>✅ ' + TL('చేయవలసినవి', 'Do') + '</h2>' +
+      row('💧', 'పశువులకు ఎప్పుడూ శుభ్రమైన తాగునీరు అందుబాటులో ఉంచండి',
+        'Keep clean drinking water available at all times') +
+      row('💉', 'ప్రభుత్వ టీకాలు సకాలంలో వేయించండి',
+        'Keep government vaccinations on schedule') +
+      row('🪱', 'సంవత్సరానికి కనీసం రెండుసార్లు నాగలి నివారణ మందు',
+        'Deworm at least twice a year') +
+      row('🥛', 'పాలు పితికే ముందు, తర్వాత పొదుగును శుభ్రం చేయండి',
+        'Clean the udder before and after milking') +
+      row('🏷️', 'చెవి ట్యాగ్ నంబర్ భద్రంగా నోట్ చేసుకోండి',
+        'Keep the ear tag number noted safely') +
+    '</div>' +
+
+    '<div class="card"><h2>⛔ ' + TL('చేయకూడనివి', "Don't") + '</h2>' +
+      row('💊', 'డాక్టర్ సూచన లేకుండా సొంతంగా యాంటీబయాటిక్స్ ఇవ్వవద్దు',
+        'Never give antibiotics without a vet’s advice', 1) +
+      row('🌾', 'పురుగుమందు చల్లిన పొలాల్లో వెంటనే మేపవద్దు',
+        'Do not graze on freshly sprayed fields', 1) +
+      row('🐄', 'ఈత కష్టమైనప్పుడు బలవంతంగా లాగవద్దు — 1962కి కాల్ చేయండి',
+        'Never pull during a difficult calving — call 1962', 1) +
+      row('🚫', 'ప్లాస్టిక్ కవర్లు, పాడైన మేత పశువులకు అందకుండా చూడండి',
+        'Keep plastic and spoiled feed away from animals', 1) +
+      row('🐍', 'పాము కాటుకు నాటు వైద్యం మీద ఆధారపడవద్దు',
+        'Do not rely on home remedies for snakebite', 1) +
+    '</div>' +
+
+    '<a class="sosbar" href="tel:1962"><span class="sb-ic">🚑</span>' +
+      '<span><b>' + esc(T('అత్యవసరమా? 1962', 'Emergency? Call 1962')) + '</b>' +
+      '<span class="hint">' + esc(T('24 గంటలూ ఉచిత', 'Free, 24 hours')) + '</span></span></a>');
+}
 function staffNav(cur) {
   var items = [['#vet', 'Queue'], ['#att', 'Attendance'], ['#leave', 'Leave'],
                ['#stock', 'Stock'], ['#issues', 'Issues']];
@@ -1255,43 +1283,57 @@ function vStaff(msg) {
   stopPoll();
   var nb = S.meta && S.meta.needsBootstrap;
   render(
+    '<div class="signin">' +
+      '<div class="si-mark"><img src="icon-192.png" alt=""></div>' +
+      '<h1>Staff sign-in</h1>' +
+      '<p class="si-sub">Veterinary &amp; Animal Husbandry Dept, Jangaon</p>' +
+    '</div>' +
     (msg ? '<div class="' + (msg.ok ? 'ok' : 'err') + '">' + esc(msg.text) + '</div>' : '') +
-    '<div class="card"><h1>Staff sign-in</h1>' +
-    '<button class="btn" id="gbtn">Sign in with Google</button>' +
-    '<p class="hint" style="margin-top:8px">Works after the district OAuth client is configured; until then use the access code.</p></div>' +
-    '<div class="card"><h2>Access code</h2>' +
-    '<label>Email</label><input id="se" type="email" value="' + esc(localStorage.getItem('jps_staff_email') || '') + '">' +
-    '<label>Access code</label><input id="sc" type="text" autocapitalize="characters">' +
-    '<div style="height:10px"></div><button class="btn ghost" id="cbtn">Sign in</button></div>' +
-    (nb ? '<div class="card"><h2>First-time setup (bootstrap admin)</h2>' +
+    '<div class="card">' +
+      '<label style="margin-top:0">Email</label>' +
+      '<input id="se" type="email" value="' + esc(localStorage.getItem('jps_staff_email') || '') + '">' +
+      '<label>Access code</label>' +
+      '<input id="sc" type="text" autocapitalize="characters" placeholder="10 characters">' +
+      '<div style="height:14px"></div>' +
+      '<button class="btn" id="cbtn">Sign in</button>' +
+      '<div class="orline"><span>or</span></div>' +
+      '<button class="btn ghost" id="gbtn">Sign in with Google</button>' +
+      '<p class="en" style="text-align:center;margin-top:9px">Google works once the district OAuth ' +
+        'client is configured. Until then use the access code.</p>' +
+    '</div>' +
+    (nb ? '<div class="card"><h2>First-time setup</h2>' +
       '<label>Your email</label><input id="be" type="email">' +
       '<label>Your name</label><input id="bn" type="text">' +
-      '<label>Bootstrap code (from setup() log)</label><input id="bc" type="text" autocapitalize="characters">' +
-      '<div style="height:10px"></div><button class="btn" id="bbtn">Create admin</button></div>' : '') +
-    '<p class="hint"><a href="#identify">← User app</a></p>');
+      '<label>Bootstrap code (from the setup() log)</label>' +
+      '<input id="bc" type="text" autocapitalize="characters">' +
+      '<div style="height:13px"></div><button class="btn" id="bbtn">Create admin</button></div>' : '') +
+    '<p class="hint" style="text-align:center"><a href="#identify">← User app</a></p>');
   el('gbtn').onclick = function () {
+    el('gbtn').classList.add('busy');
     tryGoogleSignIn().then(function (idt) {
-      if (!idt) return vStaff({ ok: false, text: 'Google sign-in unavailable on this build — use access code.' });
+      el('gbtn').classList.remove('busy');
+      if (!idt) return vStaff({ ok: false, text: 'Google sign-in unavailable on this build — use the access code.' });
       api('staff.google', { id_token: idt })
         .then(function (d) { saveAuth(d.token, d.user); location.hash = d.user.role === 'admin' ? '#admin' : '#vet'; })
         .catch(function (e) { vStaff({ ok: false, text: e.message }); });
     });
   };
   el('cbtn').onclick = function () {
-    api('staff.code', { email: el('se').value, code: el('sc').value })
+    busy(el('cbtn'), api('staff.code', { email: el('se').value, code: el('sc').value }))
       .then(function (d) {
         localStorage.setItem('jps_staff_email', el('se').value);
-        saveAuth(d.token, d.user); location.hash = d.user.role === 'admin' ? '#admin' : '#vet';
+        saveAuth(d.token, d.user);
+        location.hash = d.user.role === 'admin' ? '#admin' : '#vet';
       })
       .catch(function (e) { vStaff({ ok: false, text: e.message }); });
   };
   if (nb) el('bbtn').onclick = function () {
-    api('staff.bootstrap', { email: el('be').value, name: el('bn').value, code: el('bc').value })
+    busy(el('bbtn'), api('staff.bootstrap',
+      { email: el('be').value, name: el('bn').value, code: el('bc').value }))
       .then(function (d) { saveAuth(d.token, d.user); location.hash = '#admin'; })
       .catch(function (e) { vStaff({ ok: false, text: e.message }); });
   };
 }
-
 function vVet(tab) {
   tab = tab || 'fresh';
   loading(3);
