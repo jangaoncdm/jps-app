@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.6.0-M5 b004
+/* JPS app.js — BUILD JPS v0.6.0-M5 b005
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.6.0-M5 b004';
+var BUILD = 'JPS v0.6.0-M5 b005';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', pic:'🐄' }, { v:'buffalo', te:'గేదె', en:'Buffalo', pic:'🐃' },
@@ -123,6 +123,38 @@ function esc(s) {
   });
 }
 function el(id) { return document.getElementById(id); }
+/* A toast for actions with no screen of their own. */
+function toast(msg) {
+  var t = el('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.className = 'on';
+  clearTimeout(t._h);
+  t._h = setTimeout(function () { t.className = ''; }, 1900);
+}
+
+/* Spin inside the button while the request is in flight, so a slow village network
+   never looks like a dead tap. */
+function busy(b, p) {
+  if (!b) return p;
+  b.classList.add('busy');
+  var done = function () { b.classList.remove('busy'); };
+  return p.then(function (v) { done(); return v; },
+                function (e) { done(); throw e; });
+}
+
+/* What a screen shows while its data is still coming. */
+function skeleton(n) {
+  var rows = '';
+  for (var i = 0; i < (n || 3); i++) {
+    rows += '<div class="card"><div class="sk" style="width:' + (40 + i * 14) + '%"></div>' +
+            '<div class="sk"></div>' + (i === 0 ? '<div class="sk" style="width:70%"></div>' : '') +
+            '</div>';
+  }
+  return rows;
+}
+function loading(n) { render(skeleton(n)); }
+
 function render(html) { el('view').innerHTML = html +
   '<footer>Veterinary &amp; AH Dept, Jangaon · అత్యవసర హెల్ప్‌లైన్ <b>1962</b> · ' + BUILD + '</footer>'; }
 function badge(st) {
@@ -364,7 +396,10 @@ function vIdentify(msg) {
       identify(phone, '', 'hint');
     });
   };
-  el('manbtn').onclick = function () { identify(el('ph').value, el('nm').value, 'manual'); };
+  el('manbtn').onclick = function () {
+    el('manbtn').classList.add('busy');
+    identify(el('ph').value, el('nm').value, 'manual');
+  };
 }
 function identify(phone, name, source) {
   var dev = localStorage.getItem('jps_dev') || (Math.random().toString(36).slice(2) + Date.now().toString(36));
@@ -375,7 +410,7 @@ function identify(phone, name, source) {
 }
 
 function vHome() {
-  render('<div class="spin">' + esc(T('లోడ్ అవుతోంది…', 'Loading…')) + '</div>');
+  loading(3);
   Promise.all([api('farmer.myRequests', {}), api('meta.broadcasts', {}).catch(function () { return { broadcasts: [] }; })])
   .then(function (both) {
     var d = both[0];
@@ -394,39 +429,52 @@ function vHome() {
     var open = d.requests.filter(function (r) {
       return r.status === 'NEW' || r.status === 'ASSIGNED' || r.status === 'VISIT_SCHEDULED';
     });
-    var hero = open.length
-      ? '<a class="livecase" href="#t/' + esc(open[0].ticket) + '">' +
-          '<div class="lc-top">' + badge(open[0].status) +
-            '<span class="lc-tk">' + esc(open[0].ticket) + '</span></div>' +
-          '<div class="lc-ttl">' + esc(spLabel(open[0].species)) + '</div>' +
-          '<div class="lc-sub">' + esc(T('\u0c35\u0c3f\u0c35\u0c30\u0c3e\u0c32\u0c41 \u0c1a\u0c42\u0c21\u0c02\u0c21\u0c3f', 'Track this request')) + ' \u2192</div>' +
-        '</a>'
+    var live = open.length ? open[0] : null;
+    var liveCard = live
+      ? '<a class="livecase" href="#t/' + esc(live.ticket) + '">' +
+          '<div class="lc-top">' + badge(live.status) +
+            '<span class="lc-tk">' + esc(live.ticket) + '</span></div>' +
+          '<div class="lc-ttl">' + esc(spLabel(live.species)) + '</div>' +
+          '<div class="lc-sub">' + esc(T('\u0c35\u0c3f\u0c35\u0c30\u0c3e\u0c32\u0c41 \u0c1a\u0c42\u0c21\u0c02\u0c21\u0c3f', 'See details')) + ' \u2192</div></a>'
       : '';
+    // rail labels stay one word: in bilingual mode the English half wraps these to three
+    // lines and leaves the four tiles ragged
+    var S1 = function (te, en) { return esc(S.lang === 'en' ? en : te); };
+    var rail =
+      '<div class="svc">' +
+        '<a href="#new"><i>🩺</i>' + S1('సలహా', 'Ask a vet') + '</a>' +
+        '<a href="#home"><i>📋</i>' + S1('అభ్యర్థనలు', 'Requests') + '</a>' +
+        '<a href="#tips"><i>📗</i>' + S1('సూచనలు', 'Care tips') + '</a>' +
+        '<a href="tel:1962"><i>🚑</i>1962</a>' +
+      '</div>';
     render(
       '<div class="hero">' +
         '<div class="hero-hi">' + esc(T('\u0c28\u0c2e\u0c38\u0c4d\u0c15\u0c3e\u0c30\u0c02', 'Namaskaram')) +
           (S.user && S.user.name ? ', ' + esc(S.user.name) : '') + '</div>' +
         '<h1>' + esc(T('\u0c2a\u0c36\u0c41\u0c35\u0c41\u0c15\u0c41 \u0c35\u0c48\u0c26\u0c4d\u0c2f \u0c38\u0c39\u0c3e\u0c2f\u0c02 \u0c15\u0c3e\u0c35\u0c3e\u0c32\u0c3e?', 'Need help for your animal?')) + '</h1>' +
         '<p class="hint">' + esc(T('\u0c05\u0c2d\u0c4d\u0c2f\u0c30\u0c4d\u0c25\u0c28 \u0c2a\u0c02\u0c2a\u0c02\u0c21\u0c3f \u2014 \u0c21\u0c3e\u0c15\u0c4d\u0c1f\u0c30\u0c4d \u0c15\u0c3e\u0c32\u0c4d \u0c1a\u0c47\u0c38\u0c4d\u0c24\u0c3e\u0c30\u0c41', 'File a request and a government vet calls you back.')) + '</p>' +
-        '<div style="height:14px"></div>' +
+        '<div style="height:13px"></div>' +
         '<a class="btn" href="#new">🩺 ' + esc(T('\u0c15\u0c4a\u0c24\u0c4d\u0c24 \u0c05\u0c2d\u0c4d\u0c2f\u0c30\u0c4d\u0c25\u0c28', 'New request')) + '</a>' +
       '</div>' +
-      hero +
+      rail +
+      liveCard +
       '<a class="sosbar" href="tel:1962">' +
         '<span class="sb-ic">🚑</span>' +
         '<span><b>' + esc(T('\u0c05\u0c24\u0c4d\u0c2f\u0c35\u0c38\u0c30\u0c2e\u0c3e? 1962', 'Emergency? Call 1962')) + '</b>' +
         '<span class="hint">' + esc(T('24 \u0c17\u0c02\u0c1f\u0c32\u0c42 \u0c09\u0c1a\u0c3f\u0c24 \u0c38\u0c39\u0c3e\u0c2f\u0c02', 'Free state helpline, 24 hours')) + '</span></span>' +
       '</a>' +
       noticesCard +
-      '<div class="card"><h2>' + TL('\u0c28\u0c3e \u0c05\u0c2d\u0c4d\u0c2f\u0c30\u0c4d\u0c25\u0c28\u0c32\u0c41', 'My requests') + '</h2><table>' + rows + '</table></div>' +
+      '<div class="card"><div class="sh"><h2>' + TL('\u0c28\u0c3e \u0c05\u0c2d\u0c4d\u0c2f\u0c30\u0c4d\u0c25\u0c28\u0c32\u0c41', 'My requests') + '</h2></div>' +
+        '<table>' + rows + '</table></div>' +
       '<a class="btn ghost" href="#tips">📗 ' + esc(T('\u0c2a\u0c36\u0c41 \u0c38\u0c02\u0c30\u0c15\u0c4d\u0c37\u0c23 \u0c38\u0c42\u0c1a\u0c28\u0c32\u0c41', "Do's & don'ts for your animals")) + '</a>' +
-      '<p style="text-align:center;margin-top:14px"><a href="#" id="lo" class="hint">' + esc(T('\u0c32\u0c3e\u0c17\u0c4d \u0c05\u0c35\u0c41\u0c1f\u0c4d', 'Logout')) + '</a></p>');
+      '<p style="text-align:center;margin-top:13px"><a href="#" id="lo" class="hint">' +
+        esc(T('\u0c32\u0c3e\u0c17\u0c4d \u0c05\u0c35\u0c41\u0c1f\u0c4d', 'Logout')) + '</a></p>');
     el('lo').onclick = function (ev) { ev.preventDefault(); logout(); };
   }).catch(function (e) { if (e.code === 'auth') return logout(); render('<div class="err">' + esc(e.message) + '</div>'); });
 }
 
 function vNew() {
-  render('<div class="spin">' + esc(T('లోడ్ అవుతోంది…', 'Loading…')) + '</div>');
+  loading(3);
   loadMasters().then(function (M) {
     var tiles = SPECIES.map(function (s) {
       return '<label class="tile"><input type="radio" name="sp" value="' + s.v + '">' +
@@ -523,7 +571,7 @@ function vNew() {
 }
 
 function vTicket(ticket) {
-  render('<div class="spin">' + esc(T('లోడ్ అవుతోంది…', 'Loading…')) + '</div>');
+  loading(3);
   var staff = S.user && S.user.role !== 'farmer';
   api('request.get', { ticket: ticket }).then(function (r) {
     var events = (r.events || []).map(function (e) {
@@ -700,8 +748,10 @@ function vTicket(ticket) {
       '<a class="btn ghost" href="' + (staff ? '#vet' : '#home') + '">← ' + (staff ? 'Queue' : esc(T('హోమ్', 'Home'))) + '</a>');
     if (el('wd')) el('wd').onclick = function () {
       if (!confirm(T('ఖచ్చితంగా రద్దు చేయాలా? ఇది వెనక్కి తీసుకోలేరు.', 'Withdraw this request? This cannot be undone.'))) return;
-      el('wd').disabled = true;
-      api('request.withdraw', { id: r.id }).then(function () { vTicket(ticket); })
+      busy(el('wd'), api('request.withdraw', { id: r.id })).then(function () {
+        toast(T('అభ్యర్థన రద్దు అయ్యింది', 'Request withdrawn'));
+        vTicket(ticket);
+      })
         .catch(function (e) { el('wd').disabled = false; alert(e.message); });
     };
     if (staff && el('acts')) {
@@ -720,7 +770,8 @@ function vTicket(ticket) {
       };
       Array.prototype.forEach.call(document.querySelectorAll('#acts [data-a]'), function (b) {
         b.onclick = function () {
-          b.disabled = true;
+          b.classList.add('busy');
+          var unbusy = function () { b.classList.remove('busy'); };
           var rxFile = el('rxf') && el('rxf').files[0];
           compressPhoto(rxFile).then(function (rxb64) {
             return api('vet.act', { id: r.id, action: b.getAttribute('data-a'),
@@ -731,8 +782,11 @@ function vTicket(ticket) {
               weight_kg: (el('wkg') || {}).value || '', temp_c: (el('tpc') || {}).value || '',
               tests: (el('tst') || {}).value || '',
               rx_b64: rxb64 || '', rx_mime: 'image/jpeg' });
-          }).then(function () { if (onThisTicket()) vTicket(ticket); })
-            .catch(function (e) { b.disabled = false; alert(e.message); });
+          }).then(function () {
+            unbusy();
+            toast('Saved');
+            if (onThisTicket()) vTicket(ticket);
+          }).catch(function (e) { unbusy(); alert(e.message); });
         };
       });
     }
@@ -785,7 +839,7 @@ function wireStaffNav() {
 }
 
 function vAttend() {
-  render('<div class="spin">Loading…</div>');
+  loading(2);
   api('staff.attendance', {}).then(function (d) {
     var last = d.records[0];
     var nextIn = !last || last.type === 'out';
@@ -870,7 +924,7 @@ function vAttend() {
 }
 
 function vLeave() {
-  render('<div class="spin">Loading…</div>');
+  loading(2);
   var isAdmin = S.user.role === 'admin';
   Promise.all([api('staff.leaveList', {}), isAdmin ? api('staff.leaveList', { all: 1 }) : Promise.resolve(null)])
   .then(function (res) {
@@ -912,7 +966,7 @@ function vLeave() {
 }
 
 function vStock() {
-  render('<div class="spin">Loading…</div>');
+  loading(2);
   var fc = localStorage.getItem('jps_stock_fc') || 'AH-01';
   loadMasters().then(function (M) {
     return api('stock.list', { facility_code: fc }).then(function (d) {
@@ -956,7 +1010,7 @@ function vStock() {
 }
 
 function vIssues() {
-  render('<div class="spin">Loading…</div>');
+  loading(2);
   var isAdmin = S.user.role === 'admin';
   api('staff.issueList', {}).then(function (d) {
     var rows = d.issues.map(function (i) {
@@ -991,7 +1045,7 @@ function vIssues() {
 }
 
 function vBcast() {
-  render('<div class="spin">Loading…</div>');
+  loading(2);
   api('meta.broadcasts', {}).then(function (d) {
     var rows = d.broadcasts.map(function (b) {
       return '<div class="tip"><b>' + esc(b.title) + '</b><div>' + esc(b.body) + '</div>' +
@@ -1062,7 +1116,7 @@ function vStaff(msg) {
 
 function vVet(tab) {
   tab = tab || 'fresh';
-  render('<div class="spin">Loading queue…</div>');
+  loading(3);
   Promise.all([api('vet.queue', {}), api('staff.alerts', {}).catch(function () { return { alerts: [] }; })])
   .then(function (both) {
     var q = both[0];
@@ -1142,7 +1196,7 @@ function vVet(tab) {
 }
 
 function vAdmin() {
-  render('<div class="spin">Loading dashboard…</div>');
+  loading(4);
   Promise.all([api('admin.stats', {}), api('admin.links', {}).catch(function () { return {}; })])
   .then(function (both) {
     var st = both[0], lk = both[1];
@@ -1262,18 +1316,31 @@ document.getElementById('langbtn').onclick = function () {
   route();
 };
 
+function dismissSplash() {
+  var sp = el('splash');
+  if (sp && sp.className !== 'gone') {
+    // hold the welcome for its full beat even when the API answers instantly
+    var wait = Math.max(0, 1900 - (Date.now() - BOOT));
+    setTimeout(function () { sp.className = 'gone'; }, wait);
+  }
+}
+var BOOT = Date.now();
+
 api('meta.info', {}).then(function (m) {
   S.meta = m;
   if (S.token && S.user) {
     location.hash = S.user.role === 'farmer' ? (location.hash || '#home')
       : (S.user.role === 'admin' ? (location.hash || '#admin') : (location.hash || '#vet'));
     route();
+    dismissSplash();
     tryRegisterPush();
   } else {
     location.hash = location.hash === '#staff' ? '#staff' : '#identify';
     route();
+    dismissSplash();
   }
 }).catch(function () {
+  dismissSplash();
   render('<div class="err">సర్వర్‌కు కనెక్ట్ కాలేకపోయాం — API_URL సెట్ చేయాలి<br>' +
     'Cannot reach server. Set API_URL in app.js to the Apps Script /exec URL.</div>');
 });
