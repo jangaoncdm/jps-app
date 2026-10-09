@@ -2111,7 +2111,11 @@ function paintTabs() {
 }
 
 function route() {
-  stopCam(); // release the camera whenever the screen changes
+  stopCam();  // release the camera whenever the screen changes
+  // Drop any poll the previous screen left running. A poll re-renders its view
+  // wholesale, so one surviving a navigation would wipe a half-filled form.
+  // A screen that wants one calls startPoll itself after it has rendered.
+  stopPoll();
   paintTabs();
   var h = location.hash || '';
   if (h.indexOf('#t/') === 0) return vTicket(h.slice(3));
