@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.6.0-M5 b009
+/* JPS app.js — BUILD JPS v0.7.0-M6 b010
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.6.0-M5 b009';
+var BUILD = 'JPS v0.7.0-M6 b010';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', pic:'🐄' }, { v:'buffalo', te:'గేదె', en:'Buffalo', pic:'🐃' },
@@ -19,6 +19,14 @@ var SYMPTOMS = [
   { v:'skin', te:'చర్మ వ్యాధి / గడ్డలు', en:'Skin disease' }, { v:'diarrhea', te:'విరేచనాలు', en:'Diarrhea' },
   { v:'other', te:'ఇతర సమస్య', en:'Other' }
 ];
+// One glyph per problem. They used to share a single bandage icon, which made the
+// grid unreadable at a glance - the icon is what the eye lands on, not the caption.
+var SYMPTOM_ICON = {
+  fever: '🌡️', not_eating: '🌾', injury: '🩸', bloat: '🎈',
+  delivery: '🍼', mastitis: '🥛', skin: '🧴', diarrhea: '💧',
+  other: '🩺'
+};
+
 // backend still records a symptom per case; derive it from the chosen catalogue service
 var SERVICE2SYMPTOM = {
   'EMG-01':'delivery', 'EMG-02':'bloat', 'EMG-03':'other', 'EMG-04':'injury', 'EMG-05':'other',
@@ -58,14 +66,27 @@ var S = {
   token: localStorage.getItem('jps_token') || '',
   user: JSON.parse(localStorage.getItem('jps_user') || 'null'),
   lang: localStorage.getItem('jps_lang') || 'both',
-  meta: null, masters: null, lastRev: 0, poll: null
+  meta: null, masters: null, lastRev: 0, poll: null,
+  // Responses already fetched this session. A screen paints from here at once and
+  // refreshes behind the user; the cache is dropped whenever the backend rev moves,
+  // so it can never show something the server has since changed.
+  cache: {}, cacheRev: 0, inflight: 0
 };
+
+/** Read-through cache for GET-shaped calls. Paints now, refreshes after. */
+function cached(key, fn) {
+  if (S.cacheRev !== S.lastRev) { S.cache = {}; S.cacheRev = S.lastRev; }
+  return S.cache[key] || null;
+}
+function cacheSet(key, val) { S.cache[key] = val; return val; }
+function cacheDrop() { S.cache = {}; }
 function saveAuth(token, user) {
   S.token = token; S.user = user;
   localStorage.setItem('jps_token', token);
   localStorage.setItem('jps_user', JSON.stringify(user));
 }
 function logout() {
+  cacheDrop();
   localStorage.removeItem('jps_token'); localStorage.removeItem('jps_user');
   S.token = ''; S.user = null; location.hash = '#identify';
 }
@@ -87,9 +108,32 @@ function TL(te, en) { // label HTML: Telugu with a small English line in 'both'
   return esc(te) + ' <span class="en">' + esc(en) + '</span>';
 }
 
+/* The hairline bar at the top of the screen. Any call in flight shows it, so a
+   slow village network always has something moving on the glass. */
+function progress(on) {
+  var b = el('nprog');
+  if (!b) return;
+  S.inflight = Math.max(0, S.inflight + (on ? 1 : -1));
+  if (S.inflight > 0) {
+    b.classList.add('on');
+    var w = Number(String(b.style.width).replace('%', '')) || 0;
+    b.style.width = Math.min(88, w + (w < 55 ? 42 : 12)) + '%';
+  } else {
+    b.style.width = '100%';
+    setTimeout(function () {
+      if (S.inflight > 0) return;
+      b.classList.remove('on');
+      setTimeout(function () { if (S.inflight === 0) b.style.width = '0'; }, 260);
+    }, 170);
+  }
+}
+
 function api(action, payload, _retry) {
   payload = payload || {};
   if (S.token) payload.token = S.token;
+  if (!_retry) progress(true);
+  var settle = function (v) { if (!_retry) progress(false); return v; };
+  var reject = function (e) { if (!_retry) progress(false); throw e; };
   return fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify({ action: action, payload: payload }) })
     .then(function (r) { return r.text(); })
@@ -106,11 +150,11 @@ function api(action, payload, _retry) {
       }
     })
     .then(function (j) {
-      if (j._done) return j.data;
+      if (j._done) return settle(j.data);
       if (j.rev) S.lastRev = j.rev;
-      if (!j.ok) { var e = new Error(j.error.message); e.code = j.error.code; throw e; }
-      return j.data;
-    });
+      if (!j.ok) { var e = new Error(j.error.message); e.code = j.error.code; return reject(e); }
+      return settle(j.data);
+    }, reject);
 }
 function loadMasters() {
   if (S.masters) return Promise.resolve(S.masters);
@@ -155,8 +199,15 @@ function skeleton(n) {
 }
 function loading(n) { render(skeleton(n)); }
 
-function render(html) { el('view').innerHTML = html +
-  '<footer>Veterinary &amp; AH Dept, Jangaon · అత్యవసర హెల్ప్‌లైన్ <b>1962</b> · ' + BUILD + '</footer>'; }
+/* The build tag lives in the shell footer, not in the view: a short screen used
+   to strand it halfway up the page. Every render replays the page-enter motion. */
+function render(html) {
+  var v = el('view');
+  v.innerHTML = html;
+  v.classList.remove('swap');
+  void v.offsetWidth;          // restart the animation on a same-named class
+  v.classList.add('swap');
+}
 function badge(st) {
   return '<span class="badge b-' + esc(st) + '">' + esc(T(STATUS_TE[st] || st, STATUS_EN[st] || st)) + '</span>';
 }
@@ -438,156 +489,424 @@ function identify(phone, name, source) {
     .catch(function (e) { vIdentify(e.message); });
 }
 
+/* Husbandry lines per species, mirroring Domain.gs SPECIES_CARE. Routine care only:
+   never a diagnosis, never a medicine. Shown against the user's own animals. */
+var SPECIES_CARE = {
+  cow: [
+    ['రోజుకు 30–50 లీటర్ల శుభ్రమైన నీరు', 'Clean water, 30-50 litres a day'],
+    ['ఆరు నెలలకు ఒకసారి గాలికుంటు టీకా', 'Foot-and-mouth vaccination every six months'],
+    ['పాలు పితికే ముందు, తర్వాత పొదుగు శుభ్రం', 'Clean the udder before and after milking']
+  ],
+  buffalo: [
+    ['మధ్యాహ్నం నీడ లేదా నీటి కుంట తప్పనిసరి', 'Shade or a wallow through the afternoon'],
+    ['ఆరు నెలలకు ఒకసారి గాలికుంటు టీకా', 'Foot-and-mouth vaccination every six months'],
+    ['ఎండలో ఎక్కువ సేపు కట్టి ఉంచవద్దు', 'Do not tether in open sun for long spells']
+  ],
+  sheep: [
+    ['సంవత్సరానికి రెండుసార్లు నులిపురుగుల మందు', 'Deworm twice a year'],
+    ['కాళ్ల కుళ్లు — తడి నేలపై ఎక్కువసేపు వద్దు', 'Foot rot: avoid standing on wet ground'],
+    ['కొత్త గొర్రెను 2 వారాలు వేరుగా ఉంచండి', 'Keep a newly bought sheep apart for two weeks']
+  ],
+  goat: [
+    ['సంవత్సరానికి రెండుసార్లు నులిపురుగుల మందు', 'Deworm twice a year'],
+    ['పీపీఆర్ టీకా — మూడు సంవత్సరాలకు ఒకసారి', 'PPR vaccination once every three years'],
+    ['కొట్టంలో గాలి ఆడేలా, నేల పొడిగా ఉంచండి', 'Keep the shed airy and the floor dry']
+  ],
+  poultry: [
+    ['కొక్కెర తెగులు టీకా సకాలంలో', 'Keep Ranikhet (Newcastle) vaccination on schedule'],
+    ['నీటి తొట్టె రోజూ కడగాలి', 'Wash the drinker every day'],
+    ['అకస్మాత్తుగా ఎక్కువ కోళ్లు చనిపోతే వెంటనే తెలియజేయండి', 'Report any sudden run of deaths at once']
+  ],
+  dog: [
+    ['రేబిస్ టీకా — సంవత్సరానికి ఒకసారి', 'Rabies vaccination once a year'],
+    ['కాటు వేస్తే వెంటనే 1962కి కాల్ చేయండి', 'After any bite, call 1962 immediately'],
+    ['మూడు నెలలకు ఒకసారి నులిపురుగుల మందు', 'Deworm every three months']
+  ],
+  other: [
+    ['శుభ్రమైన నీరు, పొడి నీడ', 'Clean water and dry shade'],
+    ['ప్రభుత్వ టీకాలు సకాలంలో', 'Keep government vaccinations on schedule'],
+    ['డాక్టర్ సూచన లేకుండా మందు ఇవ్వవద్దు', 'No medicine without a vet’s advice']
+  ]
+};
+function speciesCare(v) { return SPECIES_CARE[v] || SPECIES_CARE.other; }
+
 function vHome() {
-  loading(3);
-  Promise.all([api('farmer.myRequests', {}), api('meta.broadcasts', {}).catch(function () { return { broadcasts: [] }; })])
-  .then(function (both) {
-    var d = both[0];
-    var notices = (both[1].broadcasts || []).map(function (b) {
-      return '<div class="tip"><b>' + esc(b.title) + '</b>' +
-        (b.body ? '<div>' + esc(b.body) + '</div>' : '') +
-        '<div class="hint">' + esc(String(b.at).slice(0, 10)) + '</div></div>';
-    }).join('');
-    var noticesCard = notices
-      ? '<div class="card"><h2>📢 ' + TL('ప్రకటనలు', 'Notices') + '</h2>' + notices + '</div>' : '';
-    var rows = d.requests.map(function (r) {
-      return '<tr><td><a href="#t/' + esc(r.ticket) + '"><b>' + esc(r.ticket) + '</b></a><br>' +
-        '<span class="hint">' + esc(spLabel(r.species)) + '</span></td>' +
-        '<td>' + badge(r.status) + '<br><span class="hint">' + esc(r.created_at.slice(0, 16)) + '</span></td></tr>';
-    }).join('') || '<tr><td colspan="2" class="hint">' + esc(T('ఇంకా అభ్యర్థనలు లేవు', 'No requests yet')) + '</td></tr>';
-    var open = d.requests.filter(function (r) {
-      return r.status === 'NEW' || r.status === 'ASSIGNED' || r.status === 'VISIT_SCHEDULED';
-    });
-    var live = open.length ? open[0] : null;
-    var S1 = function (te, en) { return esc(S.lang === 'en' ? en : te); };
-
-    // where this user is, taken from their own last request
-    var last = d.requests[0] || null;
-    var place = last && last.village
-      ? esc(last.village) + (last.mandal ? ', ' + esc(last.mandal) : '')
-      : esc(T('మీ ప్రాంతం', 'Set your area'));
-    var fac = last && last.facility ? last.facility : null;
-
-    var header =
-      '<div class="ahd">' +
-        '<div class="lrow"><span class="pin">📍</span>' +
-          '<a href="#loc" style="color:inherit"><div class="lb">' + S1('మీ గ్రామ పంచాయతీ', 'Your Gram Panchayat') + '</div>' +
-            '<div class="lv">' + place + ' ▾</div></a>' +
-          '<a class="av" href="#tips">📗</a></div>' +
-        '<a class="sbar" href="#new">🔍 <span>' +
-          S1('జ్వరం, ఈత, టీకా… వెతకండి', 'Fever, calving, vaccination…') +
-          '</span></a>' +
-      '</div>';
-
-    var cats =
-      '<div class="cats">' +
-        '<a href="#new"><i>🩺</i>' + S1('సలహా', 'Ask a vet') + '</a>' +
-        '<a href="#cases"><i>📋</i>' + S1('నా కేసులు', 'My cases') + '</a>' +
-        '<a href="#animals"><i>🐄</i>' + S1('నా పశువులు', 'My animals') + '</a>' +
-        '<a href="#centre"><i>🏥</i>' + S1('కేంద్రం', 'My centre') + '</a>' +
-        '<a href="#vacc"><i>💉</i>' + S1('టీకాలు', 'Vaccination') + '</a>' +
-        '<a href="#tips"><i>📗</i>' + S1('సూచనలు', 'Care tips') + '</a>' +
-      '</div>';
-
-    // the carousel carries whatever the district is actually broadcasting
-    var bans = (both[1].broadcasts || []).map(function (b, k) {
-      return '<div class="ban ' + (k % 2 ? 'b' : 'a') + '"><span class="ic">📢</span>' +
-        '<div><b>' + esc(b.title) + '</b><span>' + esc((b.body || '').slice(0, 64)) + '</span></div></div>';
-    });
-    if (!bans.length) {
-      bans.push('<div class="ban a"><span class="ic">🩺</span><div><b>' +
-        esc(T('ఉచిత వైద్య సలహా', 'Free veterinary advice')) +
-        '</b><span>' + esc(T('ప్రభుత్వ పశు వైద్యులు · 24×7', 'Government vets · 24×7')) + '</span></div></div>');
+  // #5: paint from what this session already has, so a tab you have opened before
+  // is instant and only refreshes behind you. First visit still shows a skeleton.
+  var hit = cached('home');
+  if (hit) paintHome(hit); else loading(3);
+  Promise.all([
+    api('farmer.profile', {}),
+    api('farmer.myRequests', {}),
+    api('meta.broadcasts', {}).catch(function () { return { broadcasts: [] }; })
+  ]).then(function (parts) {
+    var data = { profile: parts[0], reqs: parts[1], bc: parts[2] };
+    // keep the locally held user in step with the profile the server returns
+    if (data.profile && data.profile.user) {
+      S.user = data.profile.user;
+      localStorage.setItem('jps_user', JSON.stringify(S.user));
     }
-    var carousel = '<div class="carou">' + bans.join('') + '</div>' +
-      '<div class="dots">' + bans.map(function (x, k) {
-        return '<i class="' + (k ? '' : 'on') + '"></i>'; }).join('') + '</div>';
-
-    var liveCard = live
-      ? '<a class="livecase" href="#t/' + esc(live.ticket) + '">' +
-          '<div class="lc-top">' + badge(live.status) +
-            '<span class="lc-tk">' + esc(live.ticket) + '</span></div>' +
-          '<div class="lc-ttl">' + esc(spLabel(live.species)) + ' · ' + esc(syLabel(live.symptom)) + '</div>' +
-          '<div class="lc-sub">' + (live.vet ? esc(live.vet.name) + ' · ' : '') +
-            esc(T('వివరాలు చూడండి', 'See details')) + ' →</div></a>'
-      : '';
-
-    var split =
-      '<div class="sh"><h2>' + S1('సలహా కావాలా?', 'Need advice?') + '</h2></div>' +
-      '<div class="split">' +
-        '<a href="#new"><span class="e">📹</span><div class="t">' +
-          S1('ఆన్‌లైన్ సలహా', 'Online advice') + '</div>' +
-          '<div class="s">' + S1('డాక్టర్ కాల్ చేస్తారు', 'A vet calls you back') + '</div></a>' +
-        '<a href="#new"><span class="e">🏥</span><div class="t">' +
-          S1('కేంద్రంలో', 'At the centre') + '</div>' +
-          '<div class="s">' + S1('సందర్శన ఖరారు', 'The vet schedules a visit') + '</div></a>' +
-      '</div>';
-
-    var centreCard = fac
-      ? '<div class="sh"><h2>' + S1('మీ పశు వైద్య కేంద్రం', 'Your veterinary centre') + '</h2>' +
-          '<a href="#centre">' + S1('వివరాలు', 'Details') + '</a></div>' +
-        '<a class="card" href="#centre" style="display:block">' +
-          '<div class="rowline"><span style="font-size:23px">🏥</span>' +
-          '<div style="flex:1;min-width:0"><b style="font-size:14px">' + esc(fac.name) + '</b>' +
-          '<div class="en">' + esc(fac.code || '') + (fac.village ? ' · ' + esc(fac.village) : '') + '</div></div></div>' +
-          '<div class="en" style="margin-top:9px;padding-top:9px;border-top:1px solid var(--line)">' +
-          esc(T('మీ పంచాయతీకి కేటాయించిన కేంద్రం — మీరు ఎంచుకోవాలసిన అవసరం లేదు',
-            'Assigned to your panchayat. You do not choose a centre or a doctor.')) + '</div></a>'
-      : '';
-
-    // the problem grid files a request pre-pointed at that symptom
-    var probs = SYMPTOMS.slice(0, 8).map(function (y) {
-      return '<a href="#new"><i>🩹</i>' + esc(T(y.te, y.en)) + '</a>';
-    }).join('');
-
-    render(
-      header + cats + carousel +
-      '<div class="pad">' +
-      liveCard +
-      '<a class="sosbar" href="tel:1962">' +
-        '<span class="sb-ic">🚑</span>' +
-        '<span><b>' + esc(T('అత్యవసరమా? 1962', 'Emergency? Call 1962')) + '</b>' +
-        '<span class="hint">' + esc(T('24 గంటలూ ఉచిత సహాయం', 'Free state helpline, 24 hours')) + '</span></span></a>' +
-      split +
-      centreCard +
-      '<div class="sh"><h2>' + S1('సమస్య ఎంచుకోండి', 'Pick the problem') + '</h2>' +
-        '<a href="#new">' + S1('అన్నీ', 'All') + '</a></div>' +
-      '<div class="specs">' + probs + '</div>' +
-      noticesCard +
-      '<div class="card"><div class="sh"><h2>' + TL('నా అభ్యర్థనలు', 'My requests') + '</h2>' +
-        '<a href="#cases">' + S1('అన్నీ', 'All') + '</a></div>' +
-        '<table>' + rows + '</table></div>' +
-      '<p style="text-align:center;margin-top:13px"><a href="#" id="lo" class="hint">' +
-        esc(T('లాగ్ అవుట్', 'Logout')) + '</a></p>' +
-      '</div>');
-    autoCarousel();
-    el('lo').onclick = function (ev) { ev.preventDefault(); logout(); };
-  }).catch(function (e) { if (e.code === 'auth') return logout(); render('<div class="err">' + esc(e.message) + '</div>'); });
+    cacheSet('home', data);
+    paintHome(data);
+  }).catch(function (e) {
+    if (e.code === 'auth') return logout();
+    if (!hit) render('<div class="err">' + esc(e.message) + '</div>');
+  });
 }
 
-function vNew() {
-  loading(3);
-  loadMasters().then(function (M) {
-    var tiles = SPECIES.map(function (s) {
-      return '<label class="tile"><input type="radio" name="sp" value="' + s.v + '">' +
-        '<img class="spimg" src="img/' + s.v + '.jpg" alt="" ' +
-        'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'block\'">' +
-        '<span class="pic" style="display:none">' + s.pic + '</span>' +
-        esc(S.lang === 'en' ? s.en : s.te) +
-        (S.lang === 'both' ? '<span class="en">' + s.en + '</span>' : '') + '</label>';
+function paintHome(data) {
+  var d = data.reqs, prof = data.profile || {}, bcs = (data.bc && data.bc.broadcasts) || [];
+  var S1 = function (te, en) { return esc(S.lang === 'en' ? en : te); };
+
+  var notices = bcs.map(function (b) {
+    return '<div class="tip"><b>' + esc(b.title) + '</b>' +
+      (b.body ? '<div>' + esc(b.body) + '</div>' : '') +
+      '<div class="hint">' + esc(String(b.at).slice(0, 10)) + '</div></div>';
+  }).join('');
+  var noticesCard = notices
+    ? '<div class="card"><h2>📢 ' + TL('ప్రకటనలు', 'Notices') + '</h2>' + notices + '</div>' : '';
+
+  var rows = d.requests.map(function (r) {
+    return '<tr><td><a href="#t/' + esc(r.ticket) + '"><b>' + esc(r.ticket) + '</b></a><br>' +
+      '<span class="hint">' + esc(spLabel(r.species)) + '</span></td>' +
+      '<td>' + badge(r.status) + '<br><span class="hint">' + esc(r.created_at.slice(0, 16)) + '</span></td></tr>';
+  }).join('') || '<tr><td colspan="2" class="hint">' + esc(T('ఇంకా అభ్యర్థనలు లేవు', 'No requests yet')) + '</td></tr>';
+  var open = d.requests.filter(function (r) {
+    return r.status === 'NEW' || r.status === 'ASSIGNED' || r.status === 'VISIT_SCHEDULED';
+  });
+  var live = open.length ? open[0] : null;
+
+  // #3: the saved profile is what the header shows. It used to read the last
+  // request, so a location you had just set stayed invisible until you filed one.
+  var u = prof.user || S.user || {};
+  var placed = !!(u.gp || u.village);
+  var place = placed
+    ? esc(u.gp || u.village) + (prof.mandal ? ', ' + esc(prof.mandal) : '')
+    : esc(T('మీ ప్రాంతం ఎంచుకోండి', 'Set your area'));
+  // #2: the centre comes from the profile, not from a request that may not exist yet
+  var fac = prof.facility || (d.requests.filter(function (r) { return r.facility; })[0] || {}).facility || null;
+
+  var header =
+    '<div class="ahd">' +
+      '<div class="lrow"><span class="pin">📍</span>' +
+        '<a href="#loc" style="color:inherit"><div class="lb">' + S1('మీ గ్రామ పంచాయతీ', 'Your Gram Panchayat') + '</div>' +
+          '<div class="lv' + (placed ? ' set' : '') + '">' + place + ' ▾</div></a>' +
+        '<a class="av" href="#profile">👤</a></div>' +
+      '<a class="sbar" href="#new">🔍 <span>' +
+        S1('జ్వరం, ఈత, టీకా… వెతకండి', 'Fever, calving, vaccination…') +
+        '</span></a>' +
+    '</div>';
+
+  var cats =
+    '<div class="cats">' +
+      '<a href="#new"><i>🩺</i>' + S1('సలహా', 'Ask a vet') + '</a>' +
+      '<a href="#cases"><i>📋</i>' + S1('నా కేసులు', 'My cases') + '</a>' +
+      '<a href="#animals"><i>🐄</i>' + S1('నా పశువులు', 'My animals') + '</a>' +
+      '<a href="#centre"><i>🏥</i>' + S1('కేంద్రం', 'My centre') + '</a>' +
+      '<a href="#vacc"><i>💉</i>' + S1('టీకాలు', 'Vaccination') + '</a>' +
+      '<a href="#profile"><i>👤</i>' + S1('నా ప్రొఫైల్', 'My profile') + '</a>' +
+      '<a href="#tips"><i>📗</i>' + S1('సూచనలు', 'Care tips') + '</a>' +
+    '</div>';
+
+  var bans = bcs.map(function (b, k) {
+    return '<div class="ban ' + (k % 2 ? 'b' : 'a') + '"><span class="ic">📢</span>' +
+      '<div><b>' + esc(b.title) + '</b><span>' + esc((b.body || '').slice(0, 64)) + '</span></div></div>';
+  });
+  if (!bans.length) {
+    bans.push('<div class="ban a"><span class="ic">🩺</span><div><b>' +
+      esc(T('ఉచిత వైద్య సలహా', 'Free veterinary advice')) +
+      '</b><span>' + esc(T('ప్రభుత్వ పశు వైద్యులు · 24×7', 'Government vets · 24×7')) + '</span></div></div>');
+  }
+  var carousel = '<div class="carou">' + bans.join('') + '</div>' +
+    '<div class="dots">' + bans.map(function (x, k) {
+      return '<i class="' + (k ? '' : 'on') + '"></i>'; }).join('') + '</div>';
+
+  var liveCard = live
+    ? '<a class="livecase" href="#t/' + esc(live.ticket) + '">' +
+        '<div class="lc-top">' + badge(live.status) +
+          '<span class="lc-tk">' + esc(live.ticket) + '</span></div>' +
+        '<div class="lc-ttl">' + esc(spLabel(live.species)) + ' · ' + esc(syLabel(live.symptom)) + '</div>' +
+        '<div class="lc-sub">' + (live.vet ? esc(live.vet.name) + ' · ' : '') +
+          esc(T('వివరాలు చూడండి', 'See details')) + ' →</div></a>'
+    : '';
+
+  // #1: one nudge to finish the profile, and only while it is unfinished
+  var profNudge = (prof.complete === false)
+    ? '<a class="card profnudge" href="#profile">' +
+        '<div class="rowline"><span style="font-size:23px">👤</span>' +
+        '<div style="flex:1;min-width:0"><b style="font-size:14px">' +
+          esc(T('ప్రొఫైల్ పూర్తి చేయండి', 'Finish your profile')) + '</b>' +
+        '<div class="en">' + esc(T('ఒక్కసారి నింపండి — ప్రతి అభ్యర్థనలో మళ్లీ అడగం',
+          'Fill it once. We stop asking on every request.')) + '</div></div>' +
+        '<span class="go">→</span></div></a>'
+    : '';
+
+  var split =
+    '<div class="sh"><h2>' + S1('సలహా కావాలా?', 'Need advice?') + '</h2></div>' +
+    '<div class="split">' +
+      '<a href="#new"><span class="e">📹</span><div class="t">' +
+        S1('ఆన్‌లైన్ సలహా', 'Online advice') + '</div>' +
+        '<div class="s">' + S1('డాక్టర్ కాల్ చేస్తారు', 'A vet calls you back') + '</div></a>' +
+      '<a href="#new"><span class="e">🏥</span><div class="t">' +
+        S1('కేంద్రంలో', 'At the centre') + '</div>' +
+        '<div class="s">' + S1('సందర్శన ఖరారు', 'The vet schedules a visit') + '</div></a>' +
+    '</div>';
+
+  var centreCard = fac
+    ? '<div class="sh"><h2>' + S1('మీ పశు వైద్య కేంద్రం', 'Your veterinary centre') + '</h2>' +
+        '<a href="#centre">' + S1('వివరాలు', 'Details') + '</a></div>' +
+      '<a class="card" href="#centre" style="display:block">' +
+        '<div class="rowline"><span style="font-size:23px">🏥</span>' +
+        '<div style="flex:1;min-width:0"><b style="font-size:14px">' + esc(fac.name) + '</b>' +
+        '<div class="en">' + esc(fac.code || '') + (fac.village ? ' · ' + esc(fac.village) : '') + '</div></div></div>' +
+        '<div class="en" style="margin-top:9px;padding-top:9px;border-top:1px solid var(--line)">' +
+        esc(T('మీ పంచాయతీకి కేటాయించిన కేంద్రం — మీరు ఎంచుకోవాలసిన అవసరం లేదు',
+          'Assigned to your panchayat. You do not choose a centre or a doctor.')) + '</div></a>'
+    : '';
+
+  // #6: every problem carries its own glyph
+  var probs = SYMPTOMS.slice(0, 8).map(function (y) {
+    return '<a href="#new/' + esc(y.v) + '"><i>' + (SYMPTOM_ICON[y.v] || '🩺') + '</i>' +
+      esc(T(y.te, y.en)) + '</a>';
+  }).join('');
+
+  render(
+    header + cats + carousel +
+    '<div class="pad">' +
+    profNudge +
+    liveCard +
+    '<a class="sosbar" href="tel:1962">' +
+      '<span class="sb-ic">🚑</span>' +
+      '<span><b>' + esc(T('అత్యవసరమా? 1962', 'Emergency? Call 1962')) + '</b>' +
+      '<span class="hint">' + esc(T('24 గంటలూ ఉచిత సహాయం', 'Free state helpline, 24 hours')) + '</span></span></a>' +
+    split +
+    centreCard +
+    '<div class="sh"><h2>' + S1('సమస్య ఎంచుకోండి', 'Pick the problem') + '</h2>' +
+      '<a href="#new">' + S1('అన్నీ', 'All') + '</a></div>' +
+    '<div class="specs">' + probs + '</div>' +
+    noticesCard +
+    '<div class="card"><div class="sh"><h2>' + TL('నా అభ్యర్థనలు', 'My requests') + '</h2>' +
+      '<a href="#cases">' + S1('అన్నీ', 'All') + '</a></div>' +
+      '<table class="stagger">' + rows + '</table></div>' +
+    '<p style="text-align:center;margin-top:13px"><a href="#" id="lo" class="hint">' +
+      esc(T('లాగ్ అవుట్', 'Logout')) + '</a></p>' +
+    '</div>');
+  autoCarousel();
+  el('lo').onclick = function (ev) { ev.preventDefault(); logout(); };
+}
+/* #1: asked once, reused everywhere. The vet sees this as case context, which is
+   why the chronic box exists at all - it is the thing an owner would otherwise
+   have to re-explain on every single call. */
+function vProfile() {
+  var hit = cached('profile');
+  if (hit) paintProfile(hit); else loading(3);
+  Promise.all([api('farmer.profile', {}), loadMasters(), api('meta.info', {})])
+    .then(function (parts) {
+      var data = { prof: parts[0], gps: parts[1].gpsByMandal || {},
+                   mandals: (S.meta && S.meta.mandals) || parts[2].mandals || [] };
+      S.user = data.prof.user;
+      localStorage.setItem('jps_user', JSON.stringify(S.user));
+      cacheSet('profile', data);
+      paintProfile(data);
+    })
+    .catch(function (e) {
+      if (e.code === 'auth') return logout();
+      if (!hit) render('<div class="err">' + esc(e.message) + '</div>');
+    });
+}
+
+function paintProfile(data) {
+  var prof = data.prof, u = prof.user || {}, gps = data.gps, mandals = data.mandals;
+  var mOpts = mandals.map(function (m) {
+    return '<option value="' + esc(m.id) + '"' +
+      (String(u.mandal_id) === String(m.id) ? ' selected' : '') + '>' + esc(m.name) + '</option>';
+  }).join('');
+  var spOpts = SPECIES.map(function (x) {
+    return '<option value="' + x.v + '">' + x.pic + '  ' + esc(T(x.te, x.en)) + '</option>';
+  }).join('');
+
+  var animalRows = prof.animals.map(function (a) {
+    var sp = SPECIES.find(function (x) { return x.v === a.species; }) || { pic: '🐾' };
+    var age = a.age_years
+      ? a.age_years + ' ' + T('సంవత్సరాలు', 'yr')
+      : T('వయస్సు ఇవ్వలేదు', 'age not given');
+    return '<div class="arow"><span class="apic">' + sp.pic + '</span>' +
+      '<div class="ainfo"><b>' + esc(a.name || spLabel(a.species)) + '</b>' +
+      '<div class="en">' + esc(age) +
+        (a.pashu_tag ? ' · ' + T('ట్యాగ్', 'Tag') + ' ' + esc(a.pashu_tag) : '') +
+        (a.sex ? ' · ' + esc(a.sex === 'male' ? T('మగ', 'Male') : T('ఆడ', 'Female')) : '') +
+      '</div></div>' +
+      '<button class="xrm" data-id="' + esc(a.id) + '" aria-label="Remove">×</button></div>';
+  }).join('');
+
+  render(
+    '<h1>' + TL('నా ప్రొఫైల్', 'My profile') + '</h1>' +
+    '<p class="hint" style="margin:6px 0 13px">' +
+      esc(T('ఒక్కసారి నింపండి. ప్రతి అభ్యర్థనలో ఇవీ మళ్లీ అడగం, మరియు డాక్టర్కి ఇవే కనబడతాయి.',
+        'Fill this once. We stop asking on every request, and the doctor sees it when your case opens.')) + '</p>' +
+    '<div id="pmsg"></div>' +
+
+    '<div class="card"><h2>' + TL('మీ వివరాలు', 'Your details') + '</h2>' +
+      '<label style="margin-top:0">' + TL('పేరు', 'Name') + '</label>' +
+      '<input id="pnm" maxlength="80" value="' + esc(u.name || '') + '">' +
+      '<label>' + TL('మండలం', 'Mandal') + '</label>' +
+      '<select id="pmd"><option value="">—</option>' + mOpts + '</select>' +
+      '<label>' + TL('గ్రామ పంచాయతీ', 'Gram Panchayat') + '</label>' +
+      '<select id="pgp"><option value="">—</option></select>' +
+      '<label>' + TL('గ్రామం / నివాసం', 'Village / habitation') + '</label>' +
+      '<input id="pvg" maxlength="80" value="' + esc(u.village || '') + '">' +
+      '<label>' + TL('దీర్ఘకాలిక సమస్యలు', 'Long-running problems') + '</label>' +
+      '<textarea id="pch" maxlength="300" placeholder="' +
+        esc(T('ఉదా: పాత ఆవులలో మళ్లీ మళ్లీ పొదుగు వాపు',
+          'e.g. recurring mastitis in the older cows')) + '"></textarea>' +
+      '<p class="hint">' + esc(T('ఈ గడి డాక్టర్కు కనబడుతుంది',
+        'The doctor sees this box when your case opens.')) + '</p>' +
+      '<div style="height:12px"></div>' +
+      '<button class="btn" id="psave">' + esc(T('సేవ్ చేయండి', 'Save profile')) + '</button>' +
+    '</div>' +
+
+    '<div class="card"><div class="sh"><h2>' + TL('నా పశువులు', 'My animals') + '</h2>' +
+      '<span class="hint">' + esc(prof.herd || T('ఇంకా చేర్చలేదు', 'none yet')) + '</span></div>' +
+      '<div class="alist stagger" id="alist">' + (animalRows ||
+        '<p class="hint">' + esc(T('అభ్యర్థన పంపకుండానే ఇక్కడ పశువులను చేర్చవచ్చు',
+          'Add your animals here. You do not have to file a request to do it.')) + '</p>') + '</div>' +
+      '<div class="arow addrow">' +
+        '<select id="asp">' + spOpts + '</select>' +
+        '<input id="aag" type="number" min="0" max="40" step="0.5" placeholder="' +
+          esc(T('వయస్సు', 'Age')) + '">' +
+        '<input id="atg" maxlength="20" inputmode="numeric" placeholder="' +
+          esc(T('ట్యాగ్', 'Tag')) + '">' +
+      '</div>' +
+      '<button class="btn ghost small" id="aadd" style="margin-top:9px">+ ' +
+        esc(T('పశువును చేర్చండి', 'Add animal')) + '</button>' +
+    '</div>' +
+
+    '<a class="btn ghost" href="#home">← ' + esc(T('హోమ్', 'Home')) + '</a>');
+
+  el('pch').value = u.chronic || '';
+
+  var fillGps = function (keep) {
+    var name = (mandals.find(function (x) { return String(x.id) === el('pmd').value; }) || {}).name;
+    var list = gps[name] || [];
+    el('pgp').innerHTML = '<option value="">—</option>' + list.map(function (g) {
+      return '<option' + (g === keep ? ' selected' : '') + '>' + esc(g) + '</option>';
     }).join('');
+  };
+  el('pmd').onchange = function () { fillGps(''); };
+  fillGps(u.gp || '');
+
+  el('psave').onclick = function () {
+    busy(el('psave'), api('farmer.saveProfile', {
+      name: el('pnm').value, mandal_id: el('pmd').value,
+      gp: el('pgp').value, village: el('pvg').value || el('pgp').value,
+      chronic: el('pch').value
+    })).then(function (d) {
+      S.user = d.user;
+      localStorage.setItem('jps_user', JSON.stringify(S.user));
+      cacheDrop();
+      toast(T('ప్రొఫైల్ సేవ్ అయింది', 'Profile saved'));
+      vProfile();
+    }).catch(function (e) {
+      el('pmsg').innerHTML = '<div class="err">' + esc(e.message) + '</div>';
+      window.scrollTo(0, 0);
+    });
+  };
+
+  el('aadd').onclick = function () {
+    busy(el('aadd'), api('farmer.animalAdd', {
+      species: el('asp').value, age_years: el('aag').value, pashu_tag: el('atg').value
+    })).then(function () {
+      cacheDrop();
+      toast(T('పశువు చేరింది', 'Animal added'));
+      vProfile();
+    }).catch(function (e) { toast(e.message); });
+  };
+
+  Array.prototype.forEach.call(document.querySelectorAll('.xrm'), function (b) {
+    b.onclick = function () {
+      busy(b, api('farmer.animalRemove', { id: b.getAttribute('data-id') }))
+        .then(function () { cacheDrop(); vProfile(); })
+        .catch(function (e) { toast(e.message); });
+    };
+  });
+}
+
+function vNew(want) {
+  loading(3);
+  Promise.all([loadMasters(), api('farmer.profile', {}).catch(function () { return {}; })])
+  .then(function (parts) {
+    var M = parts[0], prof = parts[1] || {}, u = prof.user || S.user || {};
+    // #9: one media box per tile, so a photo and an emoji fallback leave the caption
+    // on the same baseline right across the grid.
+    var tiles = SPECIES.map(function (sp) {
+      return '<label class="tile"><input type="radio" name="sp" value="' + sp.v + '">' +
+        '<span class="media">' +
+          '<img class="spimg" src="img/' + sp.v + '.jpg" alt="" ' +
+          'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'block\'">' +
+          '<span class="pic" style="display:none">' + sp.pic + '</span>' +
+        '</span>' +
+        '<span class="cap"><b>' + esc(S.lang === 'en' ? sp.en : sp.te) + '</b>' +
+        (S.lang === 'both' ? '<span class="en">' + esc(sp.en) + '</span>' : '') + '</span></label>';
+    }).join('');
+
     var cats = [];
-    M.services.forEach(function (s) { if (cats.indexOf(s.category) < 0) cats.push(s.category); });
+    M.services.forEach(function (x) { if (cats.indexOf(x.category) < 0) cats.push(x.category); });
+    // the problem tapped on the home grid pre-selects its service
+    var wantCode = '';
+    if (want) {
+      Object.keys(SERVICE2SYMPTOM).forEach(function (c) {
+        if (!wantCode && SERVICE2SYMPTOM[c] === want) wantCode = c;
+      });
+    }
     var svcOpts = cats.map(function (c) {
-      var inner = M.services.filter(function (s) { return s.category === c; }).map(function (s) {
-        return '<option value="' + esc(s.code) + '">' + (s.emergency ? '🔴 ' : '') + esc(T(s.te, s.en)) + '</option>';
+      var inner = M.services.filter(function (x) { return x.category === c; }).map(function (x) {
+        return '<option value="' + esc(x.code) + '"' + (x.code === wantCode ? ' selected' : '') + '>' +
+          (x.emergency ? '🔴 ' : '') + esc(T(x.te, x.en)) + '</option>';
       }).join('');
       return '<optgroup label="' + esc(c) + '">' + inner + '</optgroup>';
     }).join('');
-    var md = (S.meta ? S.meta.mandals : []).map(function (m) { return '<option value="' + m.id + '">' + esc(m.name) + '</option>'; }).join('');
+
+    var mandals = (S.meta ? S.meta.mandals : []) || [];
+    var mName = (mandals.find(function (m) { return String(m.id) === String(u.mandal_id); }) || {}).name || '';
+    // #1: when the profile already answers these, show them as one line with a
+    // Change link instead of re-asking for mandal / GP / village / name.
+    var known = !!(u.mandal_id && (u.gp || u.village) && u.name);
+    var md = mandals.map(function (m) {
+      return '<option value="' + m.id + '"' + (String(u.mandal_id) === String(m.id) ? ' selected' : '') +
+        '>' + esc(m.name) + '</option>';
+    }).join('');
+
+    var whereBlock = known
+      ? '<div class="known" id="known">' +
+          '<span class="ic">📍</span>' +
+          '<div><b>' + esc(u.name) + '</b>' +
+            '<div class="en">' + esc([u.gp || u.village, mName].filter(Boolean).join(', ')) + '</div></div>' +
+          '<a href="#profile" class="chg">' + esc(T('మార్చండి', 'Change')) + '</a>' +
+        '</div>'
+      : '<label>' + TL('మండలం', 'Mandal') + '</label>' +
+        '<select id="md"><option value="">— ' + esc(T('ఎంచుకోండి', 'Select')) + ' —</option>' + md + '</select>' +
+        '<label>' + TL('గ్రామ పంచాయతీ', 'Gram Panchayat') + '</label>' +
+        '<select id="gp" disabled><option value="">— ' +
+          esc(T('ముందు మండలం ఎంచుకోండి', 'Pick mandal first')) + ' —</option></select>' +
+        '<label>' + TL('గ్రామం / నివాసం', 'Village / habitation') + '</label>' +
+        '<input id="vg" type="text" maxlength="80" value="' + esc(u.village || '') + '">' +
+        '<label>' + TL('మీ పేరు', 'Your name') + '</label>' +
+        '<input id="nm" type="text" maxlength="80" value="' + esc(u.name || '') + '">' +
+        '<p class="hint">' + esc(T('ఒక్కసారి మాత్రమే — తర్వాత గుర్తుంచుకుంటాం',
+          'Asked once. We remember it for next time.')) + '</p>';
+
+    // the ear tags already on the profile become a picker instead of a free field
+    var tagOpts = (prof.animals || []).filter(function (a) { return a.pashu_tag; })
+      .map(function (a) {
+        var sp = SPECIES.find(function (x) { return x.v === a.species; }) || { pic: '' };
+        return '<option value="' + esc(a.pashu_tag) + '">' + sp.pic + ' ' + esc(a.pashu_tag) +
+          (a.name ? ' · ' + esc(a.name) : '') + '</option>';
+      }).join('');
+
     render(
       '<div class="card"><h1>' + TL('కొత్త అభ్యర్థన', 'New request') + '</h1>' +
       '<div id="msg"></div>' +
+      whereBlock +
       '<label>' + TL('ఏ జంతువు?', 'Which animal?') + '</label><div class="tiles" id="tiles">' + tiles + '</div>' +
       '<label>' + TL('సమస్య / సేవ', 'Problem / service') + '</label>' +
       '<select id="svc"><option value="">— ' + esc(T('ఎంచుకోండి', 'Select')) + ' —</option>' + svcOpts + '</select>' +
@@ -597,71 +916,101 @@ function vNew() {
       '<label>' + TL('ఫోటో', 'Photo (optional)') + '</label>' +
       '<input id="pf" type="file" accept="image/*" capture="environment">' +
       '<label>' + TL('చెవి ట్యాగ్ నంబర్', 'Ear-tag no. (optional)') + '</label>' +
-      '<input id="tg" type="text" maxlength="20" inputmode="numeric">' +
-      '<label>' + TL('మండలం', 'Mandal') + '</label>' +
-      '<select id="md"><option value="">— ' + esc(T('ఎంచుకోండి', 'Select')) + ' —</option>' + md + '</select>' +
-      '<label>' + TL('గ్రామ పంచాయతీ', 'Gram Panchayat') + '</label>' +
-      '<select id="gp" disabled><option value="">— ' + esc(T('ముందు మండలం ఎంచుకోండి', 'Pick mandal first')) + ' —</option></select>' +
-      '<label>' + TL('గ్రామం / నివాసం', 'Village / habitation') + '</label><input id="vg" type="text" maxlength="80" value="' + esc(S.user && S.user.village || '') + '">' +
-      '<label>' + TL('మీ పేరు', 'Your name') + '</label><input id="nm" type="text" maxlength="80" value="' + esc(S.user && S.user.name || '') + '">' +
-      '<div class="rowline"><button class="btn small ghost" id="loc">📍 ' + esc(T('నా లొకేషన్ జోడించు', 'Attach my location')) + '</button><span class="hint" id="locst"></span></div>' +
+      (tagOpts
+        ? '<select id="tgsel"><option value="">— ' + esc(T('ఎంచుకోండి', 'Select')) + ' —</option>' +
+            tagOpts + '<option value="__new">+ ' + esc(T('వేరే ట్యాగ్', 'Another tag')) + '</option></select>' +
+          '<input id="tg" type="text" maxlength="20" inputmode="numeric" hidden>'
+        : '<input id="tg" type="text" maxlength="20" inputmode="numeric">') +
+      '<div class="rowline"><button class="btn small ghost" id="loc">📍 ' +
+        esc(T('నా లొకేషన్ జోడించు', 'Attach my location')) + '</button><span class="hint" id="locst"></span></div>' +
       '<div style="height:6px"></div>' +
       '<label class="emg"><input id="em" type="checkbox"><span><b>' + esc(T('అత్యవసరం', 'Emergency')) + '</b><br>' +
       '<span class="hint">' + esc(T('ఈత కష్టం / తీవ్ర గాయం / విషాహారం', 'Difficult delivery / severe injury / poisoning')) + '</span></span></label>' +
       '<div class="stickycta"><button class="btn" id="go">' + esc(T('అభ్యర్థన పంపండి', 'Submit request')) + '</button></div>' +
       '<div style="height:8px"></div><a class="btn ghost" href="#home">← ' + esc(T('వెనుకకు', 'Back')) + '</a></div>');
+
     var farmPos = { lat: '', lng: '' };
     el('tiles').addEventListener('change', function () {
       Array.prototype.forEach.call(document.querySelectorAll('.tile'), function (t) {
         t.classList.toggle('on', t.querySelector('input').checked);
       });
     });
-    el('svc').onchange = function () {
-      var svc = M.services.find(function (s) { return s.code === el('svc').value; });
-      if (svc && svc.emergency) { el('em').checked = true; }
+    var svcInfo = function () {
+      var svc = M.services.find(function (x) { return x.code === el('svc').value; });
+      if (svc && svc.emergency) el('em').checked = true;
       el('svcinfo').innerHTML = svc
-        ? '<p class="hint">' + (svc.emergency ? '🔴 ' : '') + esc(T('లక్ష్య స్పందన', 'Target response')) + ': ' + esc(svc.sla_raw || (svc.sla_min + ' min')) + '</p>' : '';
+        ? '<p class="hint">' + (svc.emergency ? '🔴 ' : '') +
+          esc(T('లక్ష్య స్పందన', 'Target response')) + ': ' +
+          esc(svc.sla_raw || (svc.sla_min + ' min')) + '</p>' : '';
     };
-    el('md').onchange = function () {
-      var m = (S.meta.mandals || []).find(function (x) { return String(x.id) === el('md').value; });
-      var list = (m && M.gpsByMandal[m.name]) || [];
-      el('gp').disabled = !list.length;
-      el('gp').innerHTML = '<option value="">— ' + esc(T('ఎంచుకోండి', 'Select')) + ' —</option>' +
-        list.map(function (g) { return '<option value="' + esc(g) + '">' + esc(g) + '</option>'; }).join('');
+    el('svc').onchange = svcInfo;
+    if (wantCode) svcInfo();
+
+    if (!known) {
+      el('md').onchange = function () {
+        var m = mandals.find(function (x) { return String(x.id) === el('md').value; });
+        var list = (m && M.gpsByMandal[m.name]) || [];
+        el('gp').disabled = !list.length;
+        el('gp').innerHTML = '<option value="">— ' + esc(T('ఎంచుకోండి', 'Select')) + ' —</option>' +
+          list.map(function (g) {
+            return '<option' + (g === u.gp ? ' selected' : '') + '>' + esc(g) + '</option>';
+          }).join('');
+      };
+      if (u.mandal_id) el('md').onchange();
+    }
+
+    if (el('tgsel')) el('tgsel').onchange = function () {
+      var other = el('tgsel').value === '__new';
+      el('tg').hidden = !other;
+      if (other) { el('tg').value = ''; el('tg').focus(); }
     };
+
     el('loc').onclick = function () {
       el('locst').textContent = '…';
       if (!navigator.geolocation) { el('locst').textContent = T('లొకేషన్ అందుబాటులో లేదు', 'Location unavailable'); return; }
-      navigator.geolocation.getCurrentPosition(function (p) {
-        farmPos.lat = p.coords.latitude.toFixed(6); farmPos.lng = p.coords.longitude.toFixed(6);
+      navigator.geolocation.getCurrentPosition(function (pos) {
+        farmPos.lat = pos.coords.latitude.toFixed(6); farmPos.lng = pos.coords.longitude.toFixed(6);
         el('locst').textContent = '✓ ' + farmPos.lat + ', ' + farmPos.lng;
       }, function () { el('locst').textContent = T('లొకేషన్ దొరకలేదు', 'Could not get location'); },
       { enableHighAccuracy: true, timeout: 10000 });
     };
+
     el('go').onclick = function () {
       var spv = (document.querySelector('input[name=sp]:checked') || {}).value;
       var svcCode = el('svc').value;
+      var tag = el('tgsel') && el('tgsel').value && el('tgsel').value !== '__new'
+        ? el('tgsel').value : (el('tg') ? el('tg').value : '');
       el('go').disabled = true;
+      el('go').classList.add('busy');
       compressPhoto(el('pf').files[0]).then(function (b64) {
-        return api('request.create', {
+        // when the profile already holds mandal/GP/village/name, the backend fills
+        // them in - these keys are simply left out rather than sent empty
+        var pay = {
           species: spv, symptom: SERVICE2SYMPTOM[svcCode] || 'other',
-          service_code: svcCode, gp: el('gp').value,
-          description: el('ds').value, pashu_tag: el('tg').value,
-          mandal_id: el('md').value, village: el('vg').value || el('gp').value,
-          name: el('nm').value, emergency: el('em').checked ? 1 : 0,
+          service_code: svcCode, description: el('ds').value, pashu_tag: tag,
+          emergency: el('em').checked ? 1 : 0,
           farm_lat: farmPos.lat, farm_lng: farmPos.lng,
           photo_b64: b64 || '', photo_mime: 'image/jpeg'
-        });
-      }).then(function (d) { location.hash = '#t/' + d.ticket; })
-        .catch(function (e) {
-          el('go').disabled = false;
-          el('msg').innerHTML = '<div class="err">' + esc(e.message) + '</div>';
-          window.scrollTo(0, 0);
-        });
+        };
+        if (!known) {
+          pay.gp = el('gp').value;
+          pay.mandal_id = el('md').value;
+          pay.village = el('vg').value || el('gp').value;
+          pay.name = el('nm').value;
+        }
+        return api('request.create', pay);
+      }).then(function (d) {
+        cacheDrop();                 // a new case invalidates every cached screen
+        location.hash = '#t/' + d.ticket;
+      }).catch(function (e) {
+        el('go').disabled = false;
+        el('go').classList.remove('busy');
+        el('msg').innerHTML = '<div class="err">' + esc(e.message) + '</div>';
+        window.scrollTo(0, 0);
+      });
     };
   }).catch(function (e) { if (e.code === 'auth') return logout(); render('<div class="err">' + esc(e.message) + '</div>'); });
 }
-
 function vTicket(ticket) {
   loading(3);
   var staff = S.user && S.user.role !== 'farmer';
@@ -675,6 +1024,16 @@ function vTicket(ticket) {
     var vet = r.vet ? '<p>' + esc(T('డాక్టర్', 'Doctor')) + ': <b>' + esc(r.vet.name) + '</b> — <a href="tel:' + esc(r.vet.phone) + '">' + esc(r.vet.phone) + '</a></p>' : '';
     var farmer = staff && r.farmer ? '<p>User: <b>' + esc(r.farmer.name) + '</b> · <a href="tel:' + esc(r.farmer.phone) + '">' + esc(r.farmer.phone) + '</a>' +
       (r.farmer.status === 'unconfirmed' ? ' <span class="badge b-NEW">number unconfirmed</span>' : '') + '</p>' : '';
+    // #1: the owner's herd and any long-running problem, so the doctor opens the
+    // call already knowing what is on this farm instead of asking for it again.
+    var op = staff && r.owner_profile ? r.owner_profile : null;
+    var ownerBox = op && (op.count || op.chronic)
+      ? '<div class="ownerbox"><b>Owner profile</b>' +
+          (op.count ? '🐄 ' + esc(op.herd) + ' (' + op.count + ')' : '') +
+          (op.gp ? '<div class="en">' + esc(op.gp) + (op.village && op.village !== op.gp ? ', ' + esc(op.village) : '') + '</div>' : '') +
+          (op.chronic ? '<div class="chronic"><b>Long-running</b>' + esc(op.chronic) + '</div>' : '') +
+        '</div>'
+      : '';
     var farmLoc = staff && r.farm_lat && r.farm_lng
       ? '<p><a target="_blank" rel="noopener" href="' + mapsLink(r.farm_lat, r.farm_lng) + '">🗺️ User location on map</a></p>' : '';
     var visit = r.visit_date
@@ -829,7 +1188,7 @@ function vTicket(ticket) {
       '<p class="hint">' + esc(r.gp ? r.gp + ', ' : '') + esc(r.village) + ', ' + esc(r.mandal) + '</p>' +
       (r.description ? '<p>' + esc(r.description) + '</p>' : '') +
       (r.pashu_tag ? '<p class="hint">Ear tag: ' + esc(r.pashu_tag) + '</p>' : '') +
-      visit + farmer + farmLoc + vet + photo + '</div>' + video +
+      visit + farmer + ownerBox + farmLoc + vet + photo + '</div>' + video +
       (!staff ? facilityCard(r.facility, T('మీ పశు వైద్య కేంద్రం', 'Your veterinary centre')) : '') +
       report + rx + actions +
       '<div class="card"><h2>' + TL('పురోగతి', 'Progress') + '</h2><ul class="rail">' + events + '</ul></div>' +
@@ -927,68 +1286,130 @@ function vCases(filter) {
 /* One card per ear tag, built by grouping the user's own request history. The backend has
    no animal table - the tag on each request is the only identity an animal has. */
 function vAnimals() {
-  loading(2);
-  api('farmer.myRequests', {}).then(function (d) {
-    var by = {}, order = [];
-    d.requests.forEach(function (r) {
-      var k = r.pashu_tag ? 'tag:' + r.pashu_tag : 'sp:' + r.species;
-      if (!by[k]) { by[k] = { tag: r.pashu_tag, species: r.species, rows: [] }; order.push(k); }
-      by[k].rows.push(r);
+  var hit = cached('animals');
+  if (hit) paintAnimals(hit); else loading(2);
+  Promise.all([api('farmer.profile', {}), api('farmer.myRequests', {})])
+    .then(function (parts) {
+      var data = { prof: parts[0], reqs: parts[1] };
+      cacheSet('animals', data);
+      paintAnimals(data);
+    })
+    .catch(function (e) {
+      if (e.code === 'auth') return logout();
+      if (!hit) render('<div class="err">' + esc(e.message) + '</div>');
     });
-    var cards = order.map(function (k) {
-      var a = by[k];
-      return '<div class="card">' +
-        '<div class="rowline"><span style="font-size:24px">' +
-          esc((SPECIES.find(function (x) { return x.v === a.species; }) || { pic: '🐄' }).pic) + '</span>' +
-        '<div style="flex:1;min-width:0"><b style="font-size:14.5px">' + esc(spLabel(a.species)) + '</b>' +
-        '<div class="en">' + (a.tag ? 'Tag ' + esc(a.tag) :
-          esc(T('ట్యాగ్ లేదు', 'No ear tag'))) + ' · ' +
-          a.rows.length + ' ' + esc(T('సందర్శనలు', 'visits')) + '</div></div></div>' +
-        '<table style="margin-top:9px">' + a.rows.slice(0, 5).map(function (r) {
+}
+
+function paintAnimals(data) {
+  var prof = data.prof, d = data.reqs;
+
+  // Visit history, keyed the same way an animal is: by ear tag when there is one,
+  // otherwise by species.
+  var hist = {};
+  d.requests.forEach(function (r) {
+    var k = r.pashu_tag ? 'tag:' + r.pashu_tag : 'sp:' + r.species;
+    (hist[k] = hist[k] || []).push(r);
+  });
+
+  // The profile herd leads; any species seen only in the history is appended, so
+  // nothing a user filed before the profile existed disappears off this screen.
+  var items = prof.animals.map(function (a) {
+    return { a: a, key: a.pashu_tag ? 'tag:' + a.pashu_tag : 'sp:' + a.species };
+  });
+  var seen = {};
+  items.forEach(function (x) { seen[x.key] = 1; });
+  Object.keys(hist).forEach(function (k) {
+    if (seen[k]) return;
+    var r = hist[k][0];
+    items.push({ a: { species: r.species, pashu_tag: r.pashu_tag, name: '', age_years: 0 },
+                 key: k, fromHistory: true });
+  });
+
+  var cards = items.map(function (x) {
+    var a = x.a, rows = hist[x.key] || [];
+    var sp = SPECIES.find(function (y) { return y.v === a.species; }) || { pic: '🐾' };
+    // #7: guidance that follows the KIND of animal, not a generic list
+    var care = speciesCare(a.species).map(function (c) {
+      return '<div class="crow"><span>•</span><div>' + TL(c[0], c[1]) + '</div></div>';
+    }).join('');
+    var visits = rows.length
+      ? '<table style="margin-top:9px">' + rows.slice(0, 5).map(function (r) {
           return '<tr><td><b>' + esc(String(r.created_at).slice(0, 10)) + '</b><br>' +
             '<span class="en">' + esc(syLabel(r.symptom)) + '</span></td>' +
             '<td style="text-align:right"><a class="btn small ghost" href="#t/' + esc(r.ticket) + '">' +
             esc(T('చూడండి', 'Open')) + '</a></td></tr>';
-        }).join('') + '</table></div>';
-    }).join('') || '<div class="card hint">' +
-      esc(T('ఇంకా పశువులు లేవు — అభ్యర్థన పంపినప్పుడు ఇక్కడ కనబడతాయి',
-        'No animals yet. They appear here once you file a request with an ear tag.')) + '</div>';
-    render('<h1>' + TL('నా పశువులు', 'My animals') + '</h1>' +
-      '<p class="hint" style="margin-bottom:12px">' +
-      esc(T('చెవి ట్యాగ్ నంబర్ ప్రకారం గత చరిత్ర',
-        'History grouped by ear tag')) + '</p>' + cards);
-  }).catch(function (e) { if (e.code === 'auth') return logout();
-    render('<div class="err">' + esc(e.message) + '</div>'); });
-}
+        }).join('') + '</table>'
+      : '<p class="hint" style="margin-top:8px">' +
+          esc(T('ఇంతవరకు సందర్శనలు లేవు', 'No visits yet')) + '</p>';
+    var age = a.age_years
+      ? a.age_years + ' ' + T('సంవత్సరాలు', 'yr') : '';
 
-/* The centre this user's panchayat routes to, with its real service list and timings. */
+    return '<div class="card">' +
+      '<div class="rowline"><span style="font-size:24px">' + sp.pic + '</span>' +
+      '<div style="flex:1;min-width:0"><b style="font-size:14.5px">' +
+        esc(a.name || spLabel(a.species)) + '</b>' +
+      '<div class="en">' + (a.pashu_tag ? 'Tag ' + esc(a.pashu_tag) :
+        esc(T('ట్యాగ్ లేదు', 'No ear tag'))) +
+        (age ? ' · ' + esc(age) : '') + ' · ' +
+        rows.length + ' ' + esc(T('సందర్శనలు', 'visits')) + '</div></div>' +
+      '<a class="btn small ghost" href="#new">' + esc(T('సలహా', 'Ask')) + '</a></div>' +
+      visits +
+      '<details class="carebox"><summary>' + sp.pic + ' ' +
+        esc(T('ఈ పశువుకు సూచనలు', 'Care for this animal')) + '</summary>' +
+        care + '</details>' +
+      '</div>';
+  }).join('');
+
+  render('<h1>' + TL('నా పశువులు', 'My animals') + '</h1>' +
+    '<p class="hint" style="margin-bottom:12px">' +
+      esc(prof.herd || T('ప్రొఫైల్‌లో పశువులను చేర్చండి',
+        'Add your animals on the profile')) + '</p>' +
+    '<a class="card addcta" href="#profile"><span>+</span><div><b>' +
+      esc(T('పశువును చేర్చండి', 'Add an animal')) + '</b>' +
+      '<div class="en">' + esc(T('అభ్యర్థన పంపవలసిన అవసరం లేదు',
+        'No need to file a request')) + '</div></div></a>' +
+    '<div class="stagger">' + (cards || '<div class="card hint">' +
+      esc(T('ఇంకా పశువులు లేవు', 'No animals yet')) + '</div>') + '</div>');
+}
 function vCentre() {
-  loading(3);
-  api('farmer.myRequests', {}).then(function (d) {
-    var withFac = d.requests.filter(function (r) { return r.facility; })[0];
-    if (!withFac) {
-      return render('<h1>' + TL('మీ కేంద్రం', 'Your centre') + '</h1>' +
-        '<div class="card hint">' + esc(T('మొదటి అభ్యర్థన పంపిన తర్వాత మీ కేంద్రం ఇక్కడ కనబడుతుంది',
-          'Your centre appears here once you file your first request.')) + '</div>' +
-        '<a class="btn" href="#new">' + esc(T('కొత్త అభ్యర్థన', 'New request')) + '</a>');
-    }
-    var f = withFac.facility;
-    render('<h1>' + TL('మీ కేంద్రం', 'Your centre') + '</h1>' +
-      facilityCard(f, '') +
-      '<div class="card" style="background:var(--cta-50);box-shadow:none">' +
-        '<div class="rowline" style="align-items:flex-start"><span style="font-size:17px">ℹ️</span>' +
-        '<div class="hint" style="flex:1"><b>' +
-        esc(T('ఈ కేంద్రం మీకు ఎందుకు?', 'Why this centre?')) + '</b><br>' +
-        esc(T('మీ గ్రామ పంచాయతీ ఈ కేంద్రానికి కేటాయించబడింది. డాక్టర్ను మీరు ఎంచుకోరు — ఆ రోజు డ్యూటీలో ఉన్నవారు మీ కేసు తీసుకుంటారు.',
-          'Your Gram Panchayat is mapped to this centre. You never pick a doctor — whoever is on duty that day takes your case.')) +
-        '</div></div></div>' +
-      '<a class="btn" href="#new">' + esc(T('సలహా అడగండి', 'Ask a vet')) + '</a>');
-  }).catch(function (e) { if (e.code === 'auth') return logout();
-    render('<div class="err">' + esc(e.message) + '</div>'); });
+  var hit = cached('centre');
+  if (hit) paintCentre(hit); else loading(3);
+  Promise.all([api('farmer.profile', {}), api('farmer.myRequests', {})])
+    .then(function (parts) {
+      var data = { prof: parts[0], reqs: parts[1] };
+      cacheSet('centre', data);
+      paintCentre(data);
+    })
+    .catch(function (e) {
+      if (e.code === 'auth') return logout();
+      if (!hit) render('<div class="err">' + esc(e.message) + '</div>');
+    });
 }
 
-/* Asked once at sign-in, reused on every request after that. Two equal routes in,
-   because detection can only narrow it down - see the note on the screen. */
+function paintCentre(data) {
+  // #2: resolved from the saved panchayat. It used to need a filed request first.
+  var f = data.prof.facility ||
+    ((data.reqs.requests.filter(function (r) { return r.facility; })[0] || {}).facility) || null;
+  if (!f) {
+    return render('<h1>' + TL('మీ కేంద్రం', 'Your centre') + '</h1>' +
+      '<div class="card hint">' +
+        esc(T('మీ గ్రామ పంచాయతీ ఎంచుకోగానే మీ కేంద్రం ఇక్కడ కనబడుతుంది',
+          'Pick your Gram Panchayat and your centre appears here. No request needed.')) + '</div>' +
+      '<a class="btn" href="#loc">' + esc(T('పంచాయతీ ఎంచుకోండి', 'Choose my panchayat')) + '</a>' +
+      '<div style="height:9px"></div>' +
+      '<a class="btn ghost" href="#new">' + esc(T('కొత్త అభ్యర్థన', 'New request')) + '</a>');
+  }
+  render('<h1>' + TL('మీ కేంద్రం', 'Your centre') + '</h1>' +
+    facilityCard(f, '') +
+    '<div class="card" style="background:var(--cta-50);box-shadow:none">' +
+      '<div class="rowline" style="align-items:flex-start"><span style="font-size:17px">ℹ️</span>' +
+      '<div class="hint" style="flex:1"><b>' +
+      esc(T('ఈ కేంద్రం మీకు ఎందుకు?', 'Why this centre?')) + '</b><br>' +
+      esc(T('మీ గ్రామ పంచాయతీ ఈ కేంద్రానికి కేటాయించబడింది. డాక్టర్ను మీరు ఎంచుకోరు — ఆ రోజు డ్యూటీలో ఉన్నవారు మీ కేసు తీసుకుంటారు.',
+        'Your Gram Panchayat is mapped to this centre. You never pick a doctor — whoever is on duty that day takes your case.')) +
+      '</div></div></div>' +
+    '<a class="btn" href="#new">' + esc(T('సలహా అడగండి', 'Ask a vet')) + '</a>');
+}
 function vLoc(mode) {
   mode = mode || 'auto';
   loading(2);
@@ -1059,6 +1480,7 @@ function vLoc(mode) {
           .then(function (d) {
             S.user = d.user;
             localStorage.setItem('jps_user', JSON.stringify(S.user));
+            cacheDrop();   // the home header reads the profile - it must re-fetch
             toast(T('\u0c32\u0c4a\u0c15\u0c47\u0c37\u0c28\u0c4d \u0c38\u0c47\u0c35\u0c4d \u0c05\u0c2f\u0c3f\u0c02\u0c26\u0c3f', 'Location saved'));
             location.hash = '#home';
           })
@@ -1696,6 +2118,8 @@ function route() {
   if (h === '#staff') return vStaff();
   if (h === '#vet') return vVet();
   if (h === '#admin') return vAdmin();
+  if (h === '#profile') return vProfile();
+  if (h.indexOf('#new/') === 0) return vNew(h.slice(5));  // pre-pointed from the problem grid
   if (h === '#new') return vNew();
   if (h === '#home') return vHome();
   if (h === '#tips') return vTips();
@@ -1727,6 +2151,7 @@ function dismissSplash() {
   }
 }
 var BOOT = Date.now();
+if (el('bld')) el('bld').textContent = BUILD;
 
 api('meta.info', {}).then(function (m) {
   S.meta = m;

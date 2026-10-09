@@ -149,13 +149,25 @@ input[type="checkbox"]{width:21px;height:21px;min-height:0;accent-color:var(--ct
 input[type="file"]{padding:10px;font-size:14px}
 
 .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
-.tile{position:relative;display:block;padding:0;overflow:hidden;text-align:center;font-size:12.5px;
+/* .tile is a <label>, so it inherits the global label margin. Left in place it
+   gives every tile but the first a 13px top margin, and the first then stretches
+   to its row - which is what made the grid look ragged. */
+.tile{position:relative;display:flex;flex-direction:column;padding:0;margin:0;overflow:hidden;
+  text-align:center;font-size:12.5px;
   font-weight:700;background:var(--card);border-radius:12px;cursor:pointer;
   box-shadow:inset 0 0 0 1.5px var(--line);transition:transform .11s,box-shadow .12s}
 .tile input{position:absolute;opacity:0;width:0;height:0}
-.tile .spimg{width:100%;aspect-ratio:4/3;object-fit:cover;display:block}
-.tile .pic{font-size:27px;line-height:1.1;display:block;padding-top:9px}
-.tile .en{display:block;font-size:11px;padding-bottom:2px}
+/* One media box of identical height on every tile, so a photo and an emoji
+   fallback leave the caption on the same baseline across the whole grid. */
+.tile .media{display:flex;align-items:center;justify-content:center;
+  width:100%;aspect-ratio:4/3;background:var(--app);overflow:hidden}
+.tile .spimg{width:100%;height:100%;object-fit:cover;display:block}
+.tile .pic{font-size:30px;line-height:1}
+/* The caption block is one fixed height too, whether or not an English line follows. */
+.tile .cap{display:flex;flex-direction:column;justify-content:center;
+  min-height:38px;padding:5px 3px 6px;gap:1px}
+.tile .cap b{font-size:12.5px;font-weight:700;line-height:1.2}
+.tile .en{display:block;font-size:10.5px;line-height:1.2;font-weight:600}
 .tile:has(input:checked){box-shadow:inset 0 0 0 2.4px var(--cta);background:var(--cta-50);
   animation:snap .3s cubic-bezier(.2,1.5,.4,1)}
 @keyframes snap{0%{transform:scale(.94)}60%{transform:scale(1.04)}100%{transform:none}}
@@ -423,12 +435,69 @@ nav.tabbar[hidden]{display:none}
 .split .t{font-size:13px;font-weight:800;line-height:1.25}
 .split .s{font-size:10.5px;color:var(--ink-3);margin-top:2px}
 
+/* ---------------------------------------------------------------- footer + build tag */
+/* Short screens (a skeleton, a one-card result) used to leave the build tag
+   stranded mid-page. It now lives outside #view, under a minimum page height. */
+#view{min-height:calc(100dvh - 232px)}
+body.staff #view{min-height:calc(100dvh - 170px)}
+footer.appfoot{max-width:560px;margin:0 auto;text-align:center;
+  padding:16px 15px calc(var(--navh) + 20px + env(safe-area-inset-bottom,0px));
+  font-size:11px;line-height:1.6;color:var(--ink-3)}
+body.staff footer.appfoot{padding-bottom:20px}
+footer.appfoot .bld{display:block;margin-top:3px;font-size:9px;letter-spacing:.03em;
+  opacity:.5;font-variant-numeric:tabular-nums}
+
+/* ---------------------------------------------------------------- motion */
+/* A hairline progress bar across the top for every call in flight, so the app
+   is visibly doing something even when the screen itself has not changed yet. */
+#nprog{position:fixed;top:0;left:0;height:2.5px;width:0;z-index:200;
+  background:linear-gradient(90deg,var(--cta),#54A8FF);border-radius:0 3px 3px 0;
+  opacity:0;transition:width .22s ease,opacity .25s}
+#nprog.on{opacity:1}
+/* Each new screen fades up as a whole, on top of the per-card stagger below. */
+#view.swap{animation:pageIn .3s cubic-bezier(.2,.9,.3,1) both}
+@keyframes pageIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+/* A tapped tab dips, so switching tabs reads as a press and not a redraw. */
+nav.tabbar a:active .ic{transform:scale(.84)}
+nav.tabbar a .ic{transition:transform .13s cubic-bezier(.2,1.6,.4,1)}
+nav.tabbar a.on .ic{animation:tabPop .32s cubic-bezier(.2,1.5,.4,1)}
+@keyframes tabPop{0%{transform:scale(.8)}55%{transform:scale(1.16)}100%{transform:none}}
+/* Rows arriving in a list stagger in rather than appearing all at once. */
+@keyframes rowIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+.stagger > *{animation:rowIn .3s cubic-bezier(.2,.9,.3,1) both}
+.stagger > *:nth-child(2){animation-delay:.04s}
+.stagger > *:nth-child(3){animation-delay:.08s}
+.stagger > *:nth-child(4){animation-delay:.12s}
+.stagger > *:nth-child(5){animation-delay:.16s}
+.stagger > *:nth-child(6){animation-delay:.2s}
+.stagger > *:nth-child(n+7){animation-delay:.24s}
+/* Honour the system setting: everything above collapses to an instant change. */
+@media (prefers-reduced-motion:reduce){
+  *,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;
+    transition-duration:.01ms!important}
+}
+
 .specs{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:12px}
 .specs a{background:var(--card);border-radius:11px;padding:10px 3px 8px;text-align:center;display:block;
   font-size:9.5px;font-weight:700;line-height:1.25;color:var(--ink);
   box-shadow:0 1px 3px rgba(2,71,91,.06)}
 .specs i{display:flex;width:38px;height:38px;margin:0 auto 5px;border-radius:50%;font-style:normal;
-  align-items:center;justify-content:center;font-size:19px;background:var(--app)}
+  align-items:center;justify-content:center;font-size:19px;background:var(--app);
+  animation:deal .34s cubic-bezier(.2,.9,.3,1) both}
+/* Each problem gets its own well colour as well as its own glyph — at 38px the
+   tint is what the eye separates on, before the icon resolves. */
+.specs a:nth-child(5n+1) i{background:var(--red-50)}
+.specs a:nth-child(5n+2) i{background:var(--cta-50)}
+.specs a:nth-child(5n+3) i{background:var(--green-50)}
+.specs a:nth-child(5n+4) i{background:#FBEAF2}
+.specs a:nth-child(5n+5) i{background:#F0EDFB}
+.specs a:nth-child(2) i{animation-delay:.03s}
+.specs a:nth-child(3) i{animation-delay:.06s}
+.specs a:nth-child(4) i{animation-delay:.09s}
+.specs a:nth-child(5) i{animation-delay:.12s}
+.specs a:nth-child(6) i{animation-delay:.15s}
+.specs a:nth-child(7) i{animation-delay:.18s}
+.specs a:nth-child(8) i{animation-delay:.21s}
 .split a:active,.specs a:active,.cats a:active,.ban:active{transform:scale(.972)}
 .split a,.specs a,.cats a,.ban{transition:transform .11s ease}
 
@@ -442,6 +511,49 @@ nav.tabbar[hidden]{display:none}
 .orline{display:flex;align-items:center;gap:11px;margin:14px 0;color:var(--ink-3);font-size:12px;
   font-weight:700}
 .orline:before,.orline:after{content:"";flex:1;height:1px;background:var(--line)}
+
+/* ---------------------------------------------------------------- profile + herd */
+.profnudge{display:block;background:linear-gradient(135deg,var(--cta-50),#fff)}
+.profnudge .go{font-size:19px;color:var(--cta);font-weight:800;flex:none}
+.arow{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+.arow:last-child{border-bottom:0}
+.arow .apic{font-size:23px;flex:none;width:34px;text-align:center}
+.arow .ainfo{flex:1;min-width:0}
+.arow .ainfo b{font-size:14px}
+.xrm{flex:none;width:30px;height:30px;border:0;border-radius:50%;background:var(--app);
+  color:var(--ink-3);font-size:17px;line-height:1;cursor:pointer;font-family:inherit}
+.xrm:active{background:var(--red-50);color:var(--red)}
+.addrow{gap:7px;border-bottom:0;padding-top:12px}
+.addrow select{flex:1.5;min-width:0}
+.addrow input{flex:1;min-width:0}
+.addrow select,.addrow input{margin:0}
+.addcta{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.addcta > span{flex:none;width:36px;height:36px;border-radius:50%;background:var(--cta-50);
+  color:var(--cta);font-size:21px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.addcta b{font-size:14px}
+/* Species-tailored care, folded away so the visit history stays the headline. */
+.carebox{margin-top:10px;border-top:1px solid var(--line);padding-top:9px}
+.carebox summary{font-size:12.5px;font-weight:700;color:var(--cta);cursor:pointer;list-style:none}
+.carebox summary::-webkit-details-marker{display:none}
+.carebox summary:after{content:" ▾";font-size:10px}
+.carebox[open] summary:after{content:" ▴"}
+.crow{display:flex;gap:8px;padding:7px 0;font-size:13px;line-height:1.45;color:var(--ink-2)}
+.crow > span{color:var(--cta);flex:none}
+/* What the request form shows instead of re-asking for name and place. */
+.known{display:flex;align-items:center;gap:10px;background:var(--cta-50);border-radius:11px;
+  padding:11px 12px;margin:4px 0 2px}
+.known .ic{font-size:18px;flex:none}
+.known > div{flex:1;min-width:0}
+.known b{font-size:13.5px}
+.known .chg{flex:none;font-size:12px;font-weight:700;color:var(--cta)}
+/* The saved panchayat reads as a committed value, not as a prompt. */
+.ahd .lv.set{color:var(--ink)}
+/* What the doctor sees about the owner when a case opens. */
+.ownerbox{background:#FFF8E6;border-radius:11px;padding:11px 12px;margin-top:10px;
+  font-size:13px;line-height:1.5}
+.ownerbox b{display:block;font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;
+  color:var(--ink-3);margin-bottom:4px}
+.ownerbox .chronic{margin-top:6px;padding-top:6px;border-top:1px solid rgba(2,71,91,.1)}
 
 /* ---------------------------------------------------------------- tips */
 .tiprow{display:flex;gap:11px;align-items:flex-start;padding:10px 0;
@@ -479,7 +591,10 @@ nav.tabbar[hidden]{display:none}
   </div>
 </div>
 <div id="toast"></div>
+<div id="nprog"></div>
 <div class="wrap" id="view"><div class="spin">లోడ్ అవుతోంది…</div></div>
+<footer class="appfoot">Veterinary &amp; AH Dept, Jangaon · అత్యవసర హెల్ప్‌లైన్ <b>1962</b>
+  <span class="bld" id="bld"></span></footer>
 <nav class="tabbar" id="tabbar" hidden></nav>
 <div class="fixbar" id="wvbar" hidden>
   <span class="tx">ఇన్‌స్టాల్ చేయడానికి: మెనూ (⋮) → <b>Chrome లో తెరవండి</b><br><span style="opacity:.75;font-size:12.5px">To install: menu (⋮) → Open in Chrome</span></span>
