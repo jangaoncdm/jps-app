@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.6.0-M5 b002
+/* JPS app.js — BUILD JPS v0.6.0-M5 b003
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.6.0-M5 b002';
+var BUILD = 'JPS v0.6.0-M5 b003';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', pic:'🐄' }, { v:'buffalo', te:'గేదె', en:'Buffalo', pic:'🐃' },
@@ -33,7 +33,6 @@ var EVENT_TE = { CREATED:'అభ్యర్థన నమోదైంది · F
   VISIT_SCHEDULED:'సందర్శన ఖరారు · Visit scheduled', VISIT_DONE:'సందర్శన పూర్తి · Visit completed',
   ESCALATED_1962:'1962/MVCకి పంపారు · Escalated', CANCELLED:'రద్దు · Cancelled',
   PRESCRIPTION:'మందుల చీటీ · Prescription', VIDEO_CALL:'వీడియో కాల్ · Video call' };
-var JITSI = 'https://meet.jit.si/';
 // Dosage vocabulary — mirrors Domain.gs DOSE_FREQ/DOSE_TIMING (the backend is the validator).
 var DOSE_FREQ = [
   { v:'1-0-0', en:'Once daily (morning)', te:'రోజుకు ఒకసారి (ఉదయం)' },
@@ -65,13 +64,10 @@ function saveAuth(token, user) {
   S.token = token; S.user = user;
   localStorage.setItem('jps_token', token);
   localStorage.setItem('jps_user', JSON.stringify(user));
-  ringPollStart();
 }
 function logout() {
   localStorage.removeItem('jps_token'); localStorage.removeItem('jps_user');
-  S.token = ''; S.user = null;
-  ringPollStop(); ringHide(); callClose('');
-  location.hash = '#identify';
+  S.token = ''; S.user = null; location.hash = '#identify';
 }
 
 // ---------------------------------------------------------------- language
@@ -190,127 +186,6 @@ window.addEventListener('appinstalled', function () {
 var camStream = null;
 function stopCam() {
   if (camStream) { camStream.getTracks().forEach(function (t) { t.stop(); }); camStream = null; }
-}
-
-// ---------------------------------------------------------------- in-app video ring (v0.6)
-// The doctor rings from the case card and this answers it in one tap. No wa.me hop,
-// no room URL is ever shown — the room comes back from the API and goes into an iframe.
-var RG = { poll: null, wait: null, id: null, ctx: null, buzz: null };
-
-function videoHost() { return (S.meta && S.meta.videoHost) || 'meet.jit.si'; }
-function videoUrl(host, room, name) {
-  return 'https://' + (host || videoHost()) + '/' + encodeURIComponent(room) +
-    '#config.prejoinPageEnabled=false&config.disableDeepLinking=true' +
-    '&userInfo.displayName=' + encodeURIComponent('"' + (name || '') + '"');
-}
-
-function ringSound(on) {
-  if (!on) {
-    if (RG.buzz) { clearInterval(RG.buzz); RG.buzz = null; }
-    try { if (navigator.vibrate) navigator.vibrate(0); } catch (e) {}
-    return;
-  }
-  if (RG.buzz) return;
-  var beep = function () {
-    try {
-      if (!RG.ctx) RG.ctx = new (window.AudioContext || window.webkitAudioContext)();
-      if (RG.ctx.state === 'suspended') RG.ctx.resume();
-      var o = RG.ctx.createOscillator(), g = RG.ctx.createGain(), t = RG.ctx.currentTime;
-      o.frequency.value = 880; o.connect(g); g.connect(RG.ctx.destination);
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(0.25, t + 0.05);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.7);
-      o.start(t); o.stop(t + 0.75);
-    } catch (e) {}
-    try { if (navigator.vibrate) navigator.vibrate([400, 180, 400]); } catch (e) {}
-  };
-  beep();
-  RG.buzz = setInterval(beep, 1600);
-}
-
-function ringHide() {
-  ringSound(false);
-  RG.id = null;
-  var b = el('ringbox'); if (b) b.parentNode.removeChild(b);
-}
-
-function ringShow(c) {
-  if (RG.id === c.id && el('ringbox')) return; // already ringing for this case
-  RG.id = c.id;
-  var box = el('ringbox');
-  if (!box) { box = document.createElement('div'); box.id = 'ringbox'; document.body.appendChild(box); }
-  box.innerHTML =
-    '<div class="ringcard">' +
-      '<div class="ringav">\ud83d\udcf9</div>' +
-      '<div class="ringttl">' + esc(T('డాక్టర్ వీడియో కాల్', 'Doctor video call')) + '</div>' +
-      '<div class="ringnm">' + esc(c.vet || T('డాక్టర్', 'Doctor')) + '</div>' +
-      '<div class="ringtk">' + esc(c.ticket || '') + '</div>' +
-      '<div class="ringbtns">' +
-        '<button class="ringbtn no" id="ringno">✖<span>' + esc(T('వద్దు', 'Decline')) + '</span></button>' +
-        '<button class="ringbtn yes" id="ringyes">\ud83d\udcf9<span>' + esc(T('మాట్లాడండి', 'Accept')) + '</span></button>' +
-      '</div></div>';
-  ringSound(true);
-  el('ringyes').onclick = function () {
-    ringSound(false);
-    api('video.answer', { id: c.id }).then(function (v) {
-      ringHide(); callOpen(v.host, v.room, c.id, S.user ? S.user.name : '');
-    }).catch(function (e) { ringHide(); alert(e.message); });
-  };
-  el('ringno').onclick = function () {
-    ringSound(false);
-    api('video.decline', { id: c.id }).catch(function () {});
-    ringHide();
-  };
-}
-
-function callOpen(host, room, id, name) {
-  if (!room) return;
-  var box = el('callbox');
-  if (!box) { box = document.createElement('div'); box.id = 'callbox'; document.body.appendChild(box); }
-  box.innerHTML =
-    '<iframe id="callfr" allow="camera; microphone; fullscreen; display-capture; autoplay" ' +
-      'src="' + esc(videoUrl(host, room, name)) + '"></iframe>' +
-    '<div class="callbar"><span class="callst" id="callst"></span>' +
-      '<button class="btn small red" id="callend">\ud83d\udcf4 ' + esc(T('ముగించు', 'Hang up')) + '</button></div>';
-  el('callend').onclick = function () { callClose(id); };
-}
-
-function callClose(id) {
-  if (RG.wait) { clearInterval(RG.wait); RG.wait = null; }
-  if (id) api('video.end', { id: id }).catch(function () {});
-  var b = el('callbox'); if (b) b.parentNode.removeChild(b);
-}
-
-/** Doctor side: hold "ringing" on the call screen until the user actually picks up. */
-function callWaitForAnswer(id) {
-  if (RG.wait) clearInterval(RG.wait);
-  var st = el('callst');
-  if (st) st.textContent = T('రింగ్ అవుతోంది…', 'Ringing…');
-  RG.wait = setInterval(function () {
-    api('video.state', { id: id }).then(function (v) {
-      var s = el('callst'); if (!s) return;
-      if (v.state === 'active') {
-        s.textContent = T('కనెక్ట్ అయ్యింది', 'Connected');
-        clearInterval(RG.wait); RG.wait = null;
-      } else if (v.state === 'missed' || v.state === 'ended') {
-        s.textContent = T('సమాధానం లేదు', 'No answer');
-        clearInterval(RG.wait); RG.wait = null;
-      }
-    }).catch(function () {});
-  }, 3000);
-}
-
-function ringPollStop() { if (RG.poll) { clearInterval(RG.poll); RG.poll = null; } }
-function ringPollStart() {
-  ringPollStop();
-  if (!S.token || !S.user || S.user.role !== 'farmer') return;
-  RG.poll = setInterval(function () {
-    if (document.hidden) return;                    // no polling (or battery drain) in the background
-    if (el('ringbox') || el('callbox')) return;     // already ringing or already in the call
-    api('video.state', {}).then(function (v) {
-      if (v && v.state === 'ringing') ringShow(v);
-    }).catch(function () {});
-  }, 4000);
 }
 
 // ---------------------------------------------------------------- prescribing (v0.6)
@@ -516,16 +391,36 @@ function vHome() {
         '<span class="hint">' + esc(spLabel(r.species)) + '</span></td>' +
         '<td>' + badge(r.status) + '<br><span class="hint">' + esc(r.created_at.slice(0, 16)) + '</span></td></tr>';
     }).join('') || '<tr><td colspan="2" class="hint">' + esc(T('ఇంకా అభ్యర్థనలు లేవు', 'No requests yet')) + '</td></tr>';
+    var open = d.requests.filter(function (r) {
+      return r.status === 'NEW' || r.status === 'ASSIGNED' || r.status === 'VISIT_SCHEDULED';
+    });
+    var hero = open.length
+      ? '<a class="livecase" href="#t/' + esc(open[0].ticket) + '">' +
+          '<div class="lc-top">' + badge(open[0].status) +
+            '<span class="lc-tk">' + esc(open[0].ticket) + '</span></div>' +
+          '<div class="lc-ttl">' + esc(spLabel(open[0].species)) + '</div>' +
+          '<div class="lc-sub">' + esc(T('\u0c35\u0c3f\u0c35\u0c30\u0c3e\u0c32\u0c41 \u0c1a\u0c42\u0c21\u0c02\u0c21\u0c3f', 'Track this request')) + ' \u2192</div>' +
+        '</a>'
+      : '';
     render(
-      '<div class="card" style="text-align:center;padding:22px">' +
-      '<h1>' + esc(T('పశువుకు వైద్య సహాయం కావాలా?', 'Need help for your animal?')) + '</h1>' +
-      '<p class="hint">' + esc(T('అభ్యర్థన పంపండి — డాక్టర్ కాల్ చేస్తారు', 'File a request — a vet will call you back.')) + '</p><div style="height:10px"></div>' +
-      '<a class="btn" href="#new">🩺 ' + esc(T('కొత్త అభ్యర్థన', 'New request')) + '</a><div style="height:8px"></div>' +
-      '<a class="btn red" href="tel:1962">🚑 ' + esc(T('అత్యవసరం? 1962', 'Emergency? 1962')) + '</a></div>' +
+      '<div class="hero">' +
+        '<div class="hero-hi">' + esc(T('\u0c28\u0c2e\u0c38\u0c4d\u0c15\u0c3e\u0c30\u0c02', 'Namaskaram')) +
+          (S.user && S.user.name ? ', ' + esc(S.user.name) : '') + '</div>' +
+        '<h1>' + esc(T('\u0c2a\u0c36\u0c41\u0c35\u0c41\u0c15\u0c41 \u0c35\u0c48\u0c26\u0c4d\u0c2f \u0c38\u0c39\u0c3e\u0c2f\u0c02 \u0c15\u0c3e\u0c35\u0c3e\u0c32\u0c3e?', 'Need help for your animal?')) + '</h1>' +
+        '<p class="hint">' + esc(T('\u0c05\u0c2d\u0c4d\u0c2f\u0c30\u0c4d\u0c25\u0c28 \u0c2a\u0c02\u0c2a\u0c02\u0c21\u0c3f \u2014 \u0c21\u0c3e\u0c15\u0c4d\u0c1f\u0c30\u0c4d \u0c15\u0c3e\u0c32\u0c4d \u0c1a\u0c47\u0c38\u0c4d\u0c24\u0c3e\u0c30\u0c41', 'File a request and a government vet calls you back.')) + '</p>' +
+        '<div style="height:14px"></div>' +
+        '<a class="btn" href="#new">🩺 ' + esc(T('\u0c15\u0c4a\u0c24\u0c4d\u0c24 \u0c05\u0c2d\u0c4d\u0c2f\u0c30\u0c4d\u0c25\u0c28', 'New request')) + '</a>' +
+      '</div>' +
+      hero +
+      '<a class="sosbar" href="tel:1962">' +
+        '<span class="sb-ic">🚑</span>' +
+        '<span><b>' + esc(T('\u0c05\u0c24\u0c4d\u0c2f\u0c35\u0c38\u0c30\u0c2e\u0c3e? 1962', 'Emergency? Call 1962')) + '</b>' +
+        '<span class="hint">' + esc(T('24 \u0c17\u0c02\u0c1f\u0c32\u0c42 \u0c09\u0c1a\u0c3f\u0c24 \u0c38\u0c39\u0c3e\u0c2f\u0c02', 'Free state helpline, 24 hours')) + '</span></span>' +
+      '</a>' +
       noticesCard +
-      '<div class="card"><h2>' + TL('నా అభ్యర్థనలు', 'My requests') + '</h2><table>' + rows + '</table></div>' +
-      '<a class="btn ghost" href="#tips">📗 ' + esc(T('పశు సంరక్షణ సూచనలు', "Do's & don'ts for your animals")) + '</a>' +
-      '<p style="text-align:center;margin-top:10px"><a href="#" id="lo" class="hint">' + esc(T('లాగ్ అవుట్', 'Logout')) + '</a></p>');
+      '<div class="card"><h2>' + TL('\u0c28\u0c3e \u0c05\u0c2d\u0c4d\u0c2f\u0c30\u0c4d\u0c25\u0c28\u0c32\u0c41', 'My requests') + '</h2><table>' + rows + '</table></div>' +
+      '<a class="btn ghost" href="#tips">📗 ' + esc(T('\u0c2a\u0c36\u0c41 \u0c38\u0c02\u0c30\u0c15\u0c4d\u0c37\u0c23 \u0c38\u0c42\u0c1a\u0c28\u0c32\u0c41', "Do's & don'ts for your animals")) + '</a>' +
+      '<p style="text-align:center;margin-top:14px"><a href="#" id="lo" class="hint">' + esc(T('\u0c32\u0c3e\u0c17\u0c4d \u0c05\u0c35\u0c41\u0c1f\u0c4d', 'Logout')) + '</a></p>');
     el('lo').onclick = function (ev) { ev.preventDefault(); logout(); };
   }).catch(function (e) { if (e.code === 'auth') return logout(); render('<div class="err">' + esc(e.message) + '</div>'); });
 }
@@ -573,7 +468,7 @@ function vNew() {
       '<div style="height:6px"></div>' +
       '<label class="emg"><input id="em" type="checkbox"><span><b>' + esc(T('అత్యవసరం', 'Emergency')) + '</b><br>' +
       '<span class="hint">' + esc(T('ఈత కష్టం / తీవ్ర గాయం / విషాహారం', 'Difficult delivery / severe injury / poisoning')) + '</span></span></label>' +
-      '<div style="height:12px"></div><button class="btn" id="go">' + esc(T('అభ్యర్థన పంపండి', 'Submit request')) + '</button>' +
+      '<div class="stickycta"><button class="btn" id="go">' + esc(T('అభ్యర్థన పంపండి', 'Submit request')) + '</button></div>' +
       '<div style="height:8px"></div><a class="btn ghost" href="#home">← ' + esc(T('వెనుకకు', 'Back')) + '</a></div>');
     var farmPos = { lat: '', lng: '' };
     el('tiles').addEventListener('change', function () {
@@ -738,10 +633,6 @@ function vTicket(ticket) {
           '<a class="btn red" href="tel:1962">🚑 ' + esc(T('1962కి కాల్ చేయండి', 'Call 1962 now')) + '</a>' +
           '<div style="height:8px"></div>';
       }
-      if (r.video_state === 'active') {
-        video += '<div class="rowline"><button class="btn vcall" id="rejoin">📹 ' +
-          esc(T('వీడియో కాల్‌లో చేరండి', 'Rejoin the video call')) + '</button></div>';
-      }
       if (docPhone) {
         video += '<div class="rowline">' +
           '<a class="btn small" href="tel:' + esc(docPhone) + '">📞 ' + esc(docLabel) + '</a>' +
@@ -758,12 +649,10 @@ function vTicket(ticket) {
       actions = '<div class="card" id="acts">' +
         (r.status === 'NEW'
           ? '<button class="btn" id="claim">Claim this case</button>'
-          : '<div class="rowline"><button class="btn small vcall" id="vcall">📹 Video call</button>' +
+          : '<div class="rowline"><a class="btn small wa" id="vcall" target="_blank" rel="noopener" href="https://wa.me/' +
+            esc(String(r.farmer.phone).replace(/\D/g, '')) + '">📹 WhatsApp video call</a>' +
             '<a class="btn small" href="tel:' + esc(r.farmer.phone) + '">📞 Call user</a></div>' +
-            '<p class="hint">Video call rings them inside the app — they tap once to answer. No WhatsApp needed.</p>' +
-            '<div class="rowline"><a class="btn small ghost" target="_blank" rel="noopener" href="https://wa.me/' +
-            esc(String(r.farmer.phone).replace(/\D/g, '')) + '">💬 WhatsApp instead</a></div>' +
-            '<p class="hint">Fallback only — use it if the in-app ring goes unanswered (phone off, or app not installed).</p>' +
+            '<p class="hint">WhatsApp opens on their chat — tap the 📹 icon at the top to ring them. Their phone rings like any WhatsApp call, even locked.</p>' +
             '<label>Observation &amp; diagnosis <span class="en">(required to resolve)</span></label>' +
             '<textarea id="note" maxlength="1000" placeholder="Findings · diagnosis · advice to the user"></textarea>' +
             '<div class="rowline2"><div><label>Weight (kg)</label><input id="wkg" type="number" inputmode="decimal" min="0" max="2000" placeholder="410"></div>' +
@@ -809,12 +698,6 @@ function vTicket(ticket) {
           esc(T('అభ్యర్థన రద్దు చేయండి', 'Withdraw this request')) + '</button><div style="height:8px"></div>'
         : '') +
       '<a class="btn ghost" href="' + (staff ? '#vet' : '#home') + '">← ' + (staff ? 'Queue' : esc(T('హోమ్', 'Home'))) + '</a>');
-    if (el('rejoin')) el('rejoin').onclick = function () {
-      api('video.state', { id: r.id }).then(function (v) {
-        if (v.state === 'active' || v.state === 'ringing') callOpen(v.host, v.room, r.id, S.user ? S.user.name : '');
-        else alert(T('ఆ కాల్ ముగిసింది', 'That call has ended'));
-      }).catch(function (e) { alert(e.message); });
-    };
     if (el('wd')) el('wd').onclick = function () {
       if (!confirm(T('ఖచ్చితంగా రద్దు చేయాలా? ఇది వెనక్కి తీసుకోలేరు.', 'Withdraw this request? This cannot be undone.'))) return;
       el('wd').disabled = true;
@@ -827,13 +710,9 @@ function vTicket(ticket) {
         el('addmed').onclick = function () { addMedRow(); };
         addMedRow(); // start with one row so the doctor can just type
       }
+      // the link opens WhatsApp on its own; this only records the attempt for the district
       if (el('vcall')) el('vcall').onclick = function () {
-        el('vcall').disabled = true;
-        api('vet.videoStart', { id: r.id }).then(function (v) {
-          el('vcall').disabled = false;
-          callOpen(v.host, v.room, r.id, S.user ? S.user.name : 'Doctor');
-          callWaitForAnswer(r.id); // hold 'Ringing...' until they actually pick up
-        }).catch(function (e) { el('vcall').disabled = false; alert(e.message); });
+        api('vet.callPlaced', { id: r.id }).catch(function () {});
       };
       if (el('claim')) el('claim').onclick = function () {
         api('vet.claim', { id: r.id }).then(function () { if (onThisTicket()) vTicket(ticket); })
@@ -895,7 +774,7 @@ function staffNav(cur) {
     items.unshift(['#admin', 'Dashboard']);
     items.push(['#bcast', 'Broadcasts']);
   }
-  return '<div class="tabs" style="flex-wrap:wrap">' + items.map(function (i) {
+  return '<div class="staffnav">' + items.map(function (i) {
     return '<button data-nav="' + i[0] + '" class="' + (cur === i[0] ? 'on' : '') + '">' + i[1] + '</button>';
   }).join('') + '</div>';
 }
@@ -1335,8 +1214,32 @@ function vAdmin() {
 }
 
 // ---------------------------------------------------------------- router
+/** Bottom tab bar — farmers only. Staff screens have their own nav and a tab bar
+ *  would just compete with it. Rendered from the shell so it survives every view. */
+function paintTabs() {
+  var bar = el('tabbar');
+  if (!bar) return;
+  var farmer = S.user && S.user.role === 'farmer' && S.token;
+  bar.hidden = !farmer;
+  document.body.className = farmer ? '' : 'staff';
+  if (!farmer) return;
+  var h = location.hash || '#home';
+  var tab = function (href, icon, te, en, cls) {
+    var on = (href === '#home' && (h === '#home' || h === ''))
+      || (href !== '#home' && h.indexOf(href) === 0);
+    return '<a href="' + href + '" class="' + (cls || '') + (on ? ' on' : '') + '">' +
+      '<span class="ic">' + icon + '</span><span>' + esc(T(te, en)) + '</span></a>';
+  };
+  bar.innerHTML =
+    tab('#home', '🏠', '\u0c39\u0c4b\u0c2e\u0c4d', 'Home') +
+    tab('#new', '📋', '\u0c05\u0c2d\u0c4d\u0c2f\u0c30\u0c4d\u0c25\u0c28', 'Request') +
+    tab('#tips', '📗', '\u0c38\u0c42\u0c1a\u0c28\u0c32\u0c41', 'Tips') +
+    '<a href="tel:1962" class="sos"><span class="ic">🚑</span><span>1962</span></a>';
+}
+
 function route() {
   stopCam(); // release the camera whenever the screen changes
+  paintTabs();
   var h = location.hash || '';
   if (h.indexOf('#t/') === 0) return vTicket(h.slice(3));
   if (h === '#staff') return vStaff();
@@ -1366,7 +1269,6 @@ api('meta.info', {}).then(function (m) {
       : (S.user.role === 'admin' ? (location.hash || '#admin') : (location.hash || '#vet'));
     route();
     tryRegisterPush();
-    ringPollStart();
   } else {
     location.hash = location.hash === '#staff' ? '#staff' : '#identify';
     route();

@@ -14,7 +14,7 @@ storage, 34-assertion harness, Sheets type-coercion bug found and fixed (normCel
 - Language option తెలుగు / English / both; indigo redesign; PWA install from Chrome
 - Service catalogue with per-service SLAs; GP → jurisdiction facility routing with doctor
   contact + Maps directions; visit slots; prescription photos; do's & don'ts page
-- Video calls via per-ticket Jitsi rooms (b002)
+- Video calls as WhatsApp redirections, recorded per ticket (b003)
 - Installable from the browser on Android (Chrome → Install app) and iPhone (Safari → Share →
   Add to Home Screen) — no app store needed
 - Live: backend + client b003 verified (44 live checks total)
@@ -66,5 +66,5 @@ tracking; revisit only if the DV&AHO asks for a printed monthly roster.
 - [x] Analytics: last-30-days card on the admin dashboard (volume, avg first response, G/A/R split)
 - [x] Go-live cleanup is one click now: `opsPurgeTestData` in the editor (wipes all test data,
       keeps the admin + test doctor accounts)
-- [ ] Self-hosted Jitsi decision (only if video volume justifies leaving ₹0)
+- [x] Video platform settled: WhatsApp only. No Jitsi, no WebRTC, no hosting cost.
 - [ ] AWS migration at the FREEZE-v2 triggers: >1,000 req/day, quota >60%, p95 >2.5 s, second district
