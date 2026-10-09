@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.6.0-M5 b007
+/* JPS app.js — BUILD JPS v0.6.0-M5 b008
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.6.0-M5 b007';
+var BUILD = 'JPS v0.6.0-M5 b008';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', pic:'🐄' }, { v:'buffalo', te:'గేదె', en:'Buffalo', pic:'🐃' },
@@ -471,8 +471,8 @@ function vHome() {
     var header =
       '<div class="ahd">' +
         '<div class="lrow"><span class="pin">📍</span>' +
-          '<div><div class="lb">' + S1('మీ గ్రామ పంచాయతీ', 'Your Gram Panchayat') + '</div>' +
-            '<div class="lv">' + place + '</div></div>' +
+          '<a href="#loc" style="color:inherit"><div class="lb">' + S1('మీ గ్రామ పంచాయతీ', 'Your Gram Panchayat') + '</div>' +
+            '<div class="lv">' + place + ' ▾</div></a>' +
           '<a class="av" href="#tips">📗</a></div>' +
         '<a class="sbar" href="#new">🔍 <span>' +
           S1('జ్వరం, ఈత, టీకా… వెతకండి', 'Fever, calving, vaccination…') +
@@ -485,6 +485,7 @@ function vHome() {
         '<a href="#cases"><i>📋</i>' + S1('నా కేసులు', 'My cases') + '</a>' +
         '<a href="#animals"><i>🐄</i>' + S1('నా పశువులు', 'My animals') + '</a>' +
         '<a href="#centre"><i>🏥</i>' + S1('కేంద్రం', 'My centre') + '</a>' +
+        '<a href="#vacc"><i>💉</i>' + S1('టీకాలు', 'Vaccination') + '</a>' +
         '<a href="#tips"><i>📗</i>' + S1('సూచనలు', 'Care tips') + '</a>' +
       '</div>';
 
@@ -982,6 +983,178 @@ function vCentre() {
           'Your Gram Panchayat is mapped to this centre. You never pick a doctor — whoever is on duty that day takes your case.')) +
         '</div></div></div>' +
       '<a class="btn" href="#new">' + esc(T('సలహా అడగండి', 'Ask a vet')) + '</a>');
+  }).catch(function (e) { if (e.code === 'auth') return logout();
+    render('<div class="err">' + esc(e.message) + '</div>'); });
+}
+
+/* Asked once at sign-in, reused on every request after that. Two equal routes in,
+   because detection can only narrow it down - see the note on the screen. */
+function vLoc(mode) {
+  mode = mode || 'auto';
+  loading(2);
+  Promise.all([loadMasters(), api('meta.info', {})]).then(function (both) {
+    var gps = both[0].gpsByMandal || {};
+    var mandals = (S.meta && S.meta.mandals) || both[1].mandals || [];
+    var cur = S.user || {};
+    var mOpts = mandals.map(function (m) {
+      return '<option value="' + esc(m.id) + '"' +
+        (String(cur.mandal_id) === String(m.id) ? ' selected' : '') + '>' + esc(m.name) + '</option>';
+    }).join('');
+
+    var pane = mode === 'auto'
+      ? '<div class="card" style="text-align:center;padding:20px 15px">' +
+          '<div class="locpulse">\ud83d\udccd</div>' +
+          '<div class="hint" style="margin-top:11px">' +
+            esc(T('\u0c2e\u0c3f\u0c2e\u0c4d\u0c2e\u0c32\u0c4d\u0c28\u0c3f \u0c26\u0c17\u0c4d\u0c17\u0c30\u0c3f \u0c15\u0c47\u0c02\u0c26\u0c4d\u0c30\u0c3e\u0c28\u0c3f\u0c15\u0c3f \u0c38\u0c30\u0c3f\u0c2a\u0c4b\u0c32\u0c4d\u0c1a\u0c3f, \u0c2a\u0c02\u0c1a\u0c3e\u0c2f\u0c24\u0c40\u0c28\u0c3f \u0c2e\u0c3f\u0c2e\u0c4d\u0c2e\u0c32\u0c4d\u0c28\u0c3f \u0c27\u0c43\u0c35\u0c40\u0c15\u0c30\u0c3f\u0c02\u0c1a\u0c2e\u0c28\u0c3f \u0c05\u0c21\u0c41\u0c17\u0c41\u0c24\u0c3e\u0c02',
+              'We match you to the nearest centre, then ask you to confirm the panchayat.')) + '</div>' +
+          '<button class="btn" style="margin-top:12px" id="locgo">' +
+            esc(T('\u0c32\u0c4a\u0c15\u0c47\u0c37\u0c28\u0c4d \u0c05\u0c28\u0c41\u0c2e\u0c24\u0c3f\u0c02\u0c1a\u0c02\u0c21\u0c3f', 'Allow location')) + '</button>' +
+          '<div id="locout" style="margin-top:11px"></div></div>'
+      : '<div class="card">' +
+          '<label style="margin-top:0">' + TL('\u0c2e\u0c02\u0c21\u0c32\u0c02', 'Mandal') + '</label>' +
+          '<select id="lmd">' + mOpts + '</select>' +
+          '<label>' + TL('\u0c17\u0c4d\u0c30\u0c3e\u0c2e \u0c2a\u0c02\u0c1a\u0c3e\u0c2f\u0c24\u0c40', 'Gram Panchayat') + '</label>' +
+          '<select id="lgp"><option value="">\u2014</option></select>' +
+          '<label>' + TL('\u0c17\u0c4d\u0c30\u0c3e\u0c2e\u0c02 / \u0c28\u0c3f\u0c35\u0c3e\u0c38\u0c02', 'Village / habitation') + '</label>' +
+          '<input id="lvg" maxlength="80" value="' + esc(cur.village || '') + '">' +
+          '<div style="height:13px"></div>' +
+          '<button class="btn" id="lsave">' + esc(T('\u0c38\u0c47\u0c35\u0c4d \u0c1a\u0c47\u0c2f\u0c02\u0c21\u0c3f', 'Save')) + '</button></div>';
+
+    render(
+      '<h1>' + TL('\u0c2e\u0c40 \u0c2a\u0c36\u0c41\u0c35\u0c41 \u0c0e\u0c15\u0c4d\u0c15\u0c21 \u0c09\u0c02\u0c26\u0c3f?', 'Where is your animal?') + '</h1>' +
+      '<p class="hint" style="margin:6px 0 13px">' +
+        esc(T('\u0c2e\u0c40 \u0c17\u0c4d\u0c30\u0c3e\u0c2e \u0c2a\u0c02\u0c1a\u0c3e\u0c2f\u0c24\u0c40 \u0c2c\u0c1f\u0c4d\u0c1f\u0c3f \u0c15\u0c47\u0c02\u0c26\u0c4d\u0c30\u0c02, \u0c21\u0c3e\u0c15\u0c4d\u0c1f\u0c30\u0c4d \u0c28\u0c3f\u0c30\u0c4d\u0c23\u0c2f\u0c3f\u0c02\u0c1a\u0c2c\u0c21\u0c24\u0c3e\u0c30\u0c41. \u0c12\u0c15\u0c4d\u0c15\u0c38\u0c3e\u0c30\u0c3f \u0c05\u0c21\u0c3f\u0c17\u0c3f\u0c24\u0c47 \u0c1a\u0c3e\u0c32\u0c41.',
+          'Your Gram Panchayat decides the centre and the on-duty vet. Asked once, then remembered.')) + '</p>' +
+      '<div class="split">' +
+        '<a id="optAuto" class="' + (mode === 'auto' ? 'on' : '') + '"><span class="e">\ud83d\udccd</span>' +
+          '<div class="t">' + esc(T('\u0c28\u0c3e \u0c32\u0c4a\u0c15\u0c47\u0c37\u0c28\u0c4d', 'Use my location')) + '</div>' +
+          '<div class="s">' + esc(T('\u0c35\u0c47\u0c17\u0c02\u0c17\u0c3e', 'Fastest')) + '</div></a>' +
+        '<a id="optMan" class="' + (mode === 'man' ? 'on' : '') + '"><span class="e">\u270d\ufe0f</span>' +
+          '<div class="t">' + esc(T('\u0c28\u0c47\u0c28\u0c47 \u0c0e\u0c02\u0c1a\u0c41\u0c15\u0c41\u0c02\u0c1f\u0c3e', 'Enter it myself')) + '</div>' +
+          '<div class="s">' + esc(T('\u0c1c\u0c3e\u0c2c\u0c3f\u0c24\u0c3e \u0c28\u0c41\u0c02\u0c1a\u0c3f', 'From a list')) + '</div></a>' +
+      '</div>' + pane +
+      '<div class="card" style="background:var(--cta-50);box-shadow:none">' +
+        '<div class="rowline" style="align-items:flex-start"><span style="font-size:17px">\u2139\ufe0f</span>' +
+        '<div class="hint" style="flex:1">' +
+        esc(T('\u0c17\u0c4d\u0c30\u0c3e\u0c2e \u0c2a\u0c02\u0c1a\u0c3e\u0c2f\u0c24\u0c40 \u0c17\u0c21\u0c3f \u0c35\u0c3f\u0c35\u0c30\u0c3e\u0c32\u0c41 \u0c07\u0c02\u0c15\u0c3e \u0c2a\u0c42\u0c30\u0c4d\u0c24\u0c3f \u0c15\u0c3e\u0c32\u0c47\u0c26\u0c41, \u0c05\u0c02\u0c26\u0c41\u0c15\u0c47 \u0c32\u0c4a\u0c15\u0c47\u0c37\u0c28\u0c4d \u0c26\u0c17\u0c4d\u0c17\u0c30\u0c3f \u0c15\u0c47\u0c02\u0c26\u0c4d\u0c30\u0c3e\u0c28\u0c4d\u0c28\u0c3f \u0c2e\u0c3e\u0c24\u0c4d\u0c30\u0c2e\u0c47 \u0c1a\u0c42\u0c2a\u0c41\u0c24\u0c41\u0c02\u0c26\u0c3f \u2014 \u0c2e\u0c40\u0c30\u0c41 \u0c27\u0c43\u0c35\u0c40\u0c15\u0c30\u0c3f\u0c02\u0c1a\u0c3e\u0c32\u0c3f.',
+          'GP boundary data is incomplete in the district master, so detection can only point at the nearest centre and ask you to confirm.')) +
+        '</div></div></div>');
+
+    el('optAuto').onclick = function () { vLoc('auto'); };
+    el('optMan').onclick = function () { vLoc('man'); };
+
+    if (mode === 'man') {
+      var fillGps = function () {
+        var name = (mandals.find(function (x) { return String(x.id) === el('lmd').value; }) || {}).name;
+        var list = gps[name] || [];
+        el('lgp').innerHTML = '<option value="">\u2014</option>' + list.map(function (g) {
+          return '<option' + (g === cur.gp ? ' selected' : '') + '>' + esc(g) + '</option>';
+        }).join('');
+      };
+      el('lmd').onchange = fillGps;
+      fillGps();
+      el('lsave').onclick = function () {
+        busy(el('lsave'), api('farmer.setLocation', { mandal_id: el('lmd').value,
+          gp: el('lgp').value, village: el('lvg').value }))
+          .then(function (d) {
+            S.user = d.user;
+            localStorage.setItem('jps_user', JSON.stringify(S.user));
+            toast(T('\u0c32\u0c4a\u0c15\u0c47\u0c37\u0c28\u0c4d \u0c38\u0c47\u0c35\u0c4d \u0c05\u0c2f\u0c3f\u0c02\u0c26\u0c3f', 'Location saved'));
+            location.hash = '#home';
+          })
+          .catch(function (e) { toast(e.message); });
+      };
+    } else {
+      el('locgo').onclick = function () {
+        var b = el('locgo');
+        b.classList.add('busy');
+        el('locout').innerHTML = '<div class="sk" style="width:70%;margin:0 auto"></div>';
+        var done = function (fac) {
+          b.classList.remove('busy');
+          b.hidden = true;
+          el('locout').innerHTML =
+            '<div class="locfound"><div class="rowline"><span style="font-size:17px">\u2705</span>' +
+            '<div style="flex:1;min-width:0"><b>' + esc(fac ? fac.name : T('\u0c26\u0c17\u0c4d\u0c17\u0c30\u0c3f \u0c15\u0c47\u0c02\u0c26\u0c4d\u0c30\u0c02', 'Nearest centre')) + '</b>' +
+            '<div class="en">' + esc(fac ? (fac.mandal || '') + (fac.village ? ' \u00b7 ' + fac.village : '') : '') + '</div></div></div>' +
+            '<div class="en" style="margin-top:7px">' +
+            esc(T('\u0c07\u0c26\u0c3f \u0c38\u0c30\u0c48\u0c28\u0c26\u0c47\u0c28\u0c3e? \u0c2a\u0c02\u0c1a\u0c3e\u0c2f\u0c24\u0c40\u0c28\u0c3f \u0c0e\u0c02\u0c1a\u0c41\u0c15\u0c4b\u0c02\u0c21\u0c3f.', 'Is that right? Pick your panchayat to confirm.')) + '</div>' +
+            '<button class="btn" style="margin-top:10px" id="locconf">' +
+            esc(T('\u0c2a\u0c02\u0c1a\u0c3e\u0c2f\u0c24\u0c40 \u0c0e\u0c02\u0c1a\u0c41\u0c15\u0c4b\u0c02\u0c21\u0c3f', 'Choose my panchayat')) + '</button></div>';
+          el('locconf').onclick = function () { vLoc('man'); };
+        };
+        if (!navigator.geolocation) return done(null);
+        navigator.geolocation.getCurrentPosition(function (pos) {
+          var fs = (S.masters && S.masters.facilities) || [];
+          var best = null, bestD = Infinity;
+          fs.forEach(function (f) {
+            if (!f.lat || !f.lng) return;
+            var dx = (Number(f.lat) - pos.coords.latitude) * 111000;
+            var dy = (Number(f.lng) - pos.coords.longitude) * 105000;
+            var dd = Math.sqrt(dx * dx + dy * dy);
+            if (dd < bestD) { bestD = dd; best = f; }
+          });
+          done(best);
+        }, function () { done(null); }, { timeout: 8000 });
+      };
+    }
+  }).catch(function (e) { if (e.code === 'auth') return logout();
+    render('<div class="err">' + esc(e.message) + '</div>'); });
+}
+
+/* Vaccination, derived from resolved PRV-01 visits. There is no vaccination register
+   in the backend, so this reads the user's own history rather than inventing dates. */
+function vVacc() {
+  loading(2);
+  api('farmer.myRequests', {}).then(function (d) {
+    var today = new Date().toISOString().slice(0, 10);
+    var addMonths = function (iso, n) {
+      var q = String(iso).slice(0, 10).split('-');
+      var y = Number(q[0]), mo = Number(q[1]) - 1 + n, dd = Number(q[2]);
+      y += Math.floor(mo / 12); mo = ((mo % 12) + 12) % 12;
+      var last = [31, (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0 ? 29 : 28,
+                  31, 30, 31, 30, 31, 31, 30, 31, 30, 31][mo];
+      if (dd > last) dd = last;
+      var two = function (x) { return (x < 10 ? '0' : '') + x; };
+      return y + '-' + two(mo + 1) + '-' + two(dd);
+    };
+    var by = {}, order = [];
+    d.requests.forEach(function (r) {
+      var k = r.pashu_tag ? 'tag:' + r.pashu_tag : 'sp:' + r.species;
+      if (!by[k]) { by[k] = { tag: r.pashu_tag, species: r.species, last: null }; order.push(k); }
+      var isVacc = r.service && r.service.code === 'PRV-01';
+      if (isVacc && r.status === 'RESOLVED') {
+        var when = String(r.closed_at || r.created_at).slice(0, 10);
+        if (!by[k].last || when > by[k].last) by[k].last = when;
+      }
+    });
+    var cards = order.map(function (k) {
+      var a = by[k], due = a.last ? addMonths(a.last, 6) : null;
+      var state = !a.last ? 'none' : (today > due ? 'overdue' : 'ok');
+      var pill = state === 'none'
+        ? '<span class="badge b-NEW">' + esc(T('\u0c30\u0c3f\u0c15\u0c3e\u0c30\u0c4d\u0c21\u0c41 \u0c32\u0c47\u0c26\u0c41', 'No record')) + '</span>'
+        : state === 'overdue'
+          ? '<span class="badge b-ESCALATED">' + esc(T('\u0c06\u0c32\u0c38\u0c4d\u0c2f\u0c02', 'Overdue')) + '</span>'
+          : '<span class="badge b-RESOLVED">' + esc(due) + '</span>';
+      return '<div class="card"><div class="rowline">' +
+        '<span style="font-size:23px">' + esc((SPECIES.find(function (x) { return x.v === a.species; })
+          || { pic: '\ud83d\udc04' }).pic) + '</span>' +
+        '<div style="flex:1;min-width:0"><b style="font-size:14px">' + esc(spLabel(a.species)) + '</b>' +
+        '<div class="en">' + (a.tag ? 'Tag ' + esc(a.tag) : esc(T('\u0c1f\u0c4d\u0c2f\u0c3e\u0c17\u0c4d \u0c32\u0c47\u0c26\u0c41', 'No ear tag'))) + '</div></div>' +
+        pill + '</div>' +
+        '<div class="en" style="margin-top:8px">' + (a.last
+          ? esc(T('\u0c1a\u0c3f\u0c35\u0c30\u0c3f \u0c1f\u0c40\u0c15\u0c3e', 'Last vaccination')) + ': ' + esc(a.last) +
+            ' \u00b7 ' + esc(T('\u0c24\u0c30\u0c41\u0c35\u0c3e\u0c24\u0c3f\u0c26\u0c3f', 'next')) + ' ' + esc(due)
+          : esc(T('\u0c08 \u0c2f\u0c3e\u0c2a\u0c4d\u200c\u0c32\u0c4b \u0c1f\u0c40\u0c15\u0c3e \u0c30\u0c3f\u0c15\u0c3e\u0c30\u0c4d\u0c21\u0c41 \u0c32\u0c47\u0c26\u0c41', 'No vaccination recorded through this app')) ) +
+        '</div></div>';
+    }).join('') || '<div class="card hint">' +
+      esc(T('\u0c07\u0c02\u0c15\u0c3e \u0c2a\u0c36\u0c41\u0c35\u0c41\u0c32\u0c41 \u0c32\u0c47\u0c35\u0c41', 'No animals yet')) + '</div>';
+
+    render('<h1>' + TL('\u0c1f\u0c40\u0c15\u0c3e\u0c32\u0c41', 'Vaccination') + '</h1>' +
+      '<p class="hint" style="margin:6px 0 13px">' +
+        esc(T('FMD \u0c1f\u0c40\u0c15\u0c3e \u0c2a\u0c4d\u0c30\u0c24\u0c3f 6 \u0c28\u0c46\u0c32\u0c32\u0c15\u0c41. \u0c08 \u0c24\u0c47\u0c26\u0c40\u0c32\u0c41 \u0c2e\u0c40 \u0c38\u0c4a\u0c02\u0c24 \u0c2d\u0c47\u0c1f\u0c40 \u0c1a\u0c30\u0c3f\u0c24\u0c4d\u0c30 \u0c28\u0c41\u0c02\u0c1a\u0c3f \u0c32\u0c46\u0c15\u0c4d\u0c15\u0c3f\u0c02\u0c1a\u0c3f\u0c28\u0c35\u0c3f \u2014 \u0c05\u0c27\u0c3f\u0c15\u0c3e\u0c30\u0c3f\u0c15 \u0c30\u0c3f\u0c1c\u0c3f\u0c38\u0c4d\u0c1f\u0c30\u0c4d \u0c15\u0c3e\u0c26\u0c41.',
+          'FMD is every 6 months. These dates are worked out from your own visit history, not an official register.')) + '</p>' +
+      cards +
+      '<a class="btn" href="#new">' + esc(T('\u0c1f\u0c40\u0c15\u0c3e \u0c15\u0c4b\u0c38\u0c02 \u0c05\u0c2d\u0c4d\u0c2f\u0c30\u0c4d\u0c25\u0c3f\u0c02\u0c1a\u0c02\u0c21\u0c3f', 'Request a vaccination')) + '</a>');
   }).catch(function (e) { if (e.code === 'auth') return logout();
     render('<div class="err">' + esc(e.message) + '</div>'); });
 }
@@ -1526,6 +1699,8 @@ function route() {
   if (h === '#cases') return vCases();
   if (h === '#animals') return vAnimals();
   if (h === '#centre') return vCentre();
+  if (h === '#loc') return vLoc();
+  if (h === '#vacc') return vVacc();
   if (h === '#att') return vAttend();
   if (h === '#leave') return vLeave();
   if (h === '#stock') return vStock();
