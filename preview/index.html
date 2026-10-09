@@ -1,0 +1,1006 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1D6FE0">
+<meta name="robots" content="noindex">
+<title>Pashu Seva Assigned Care</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Telugu:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap">
+<style>
+/* Apollo 24|7 cloned structurally: light header with location + search and a mic, a circular
+   category rail, an offer carousel with dots, the "Book an appointment for" split, a 4-up
+   specialty grid, doctor cards with fee + orange CONSULT, and a 5-tab bottom bar.
+   Apollo's structure with our own accent: #02475B ink, #1D6FE0 action blue,
+   #00B38E green, #F7F8F5 ground. Blue over orange because a government service should
+   read as official rather than promotional, and it holds up better in direct sun. */
+:root{
+  --ink:#02475B; --ink-2:#67909E; --ink-3:#9BB5BF; --navy:#01364A;
+  --cta:#1D6FE0; --cta-d:#1557B8; --cta-50:#E8F0FD;
+  --green:#00B38E; --green-50:#E5F7F3;
+  --app:#F7F8F5; --card:#FFFFFF; --line:#E8EDF0; --line-2:#D4DEE3;
+  --red:#D0342C; --red-50:#FCEDEC; --amber:#A96D00; --amber-50:#FFF6E6;
+  --wa:#25D366; --star:#FFB800;
+  --fb:"Noto Sans Telugu","Inter",system-ui,sans-serif;
+  color-scheme:light;
+}
+*{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{background:#01222E;font-family:var(--fb);color:var(--ink);overflow:hidden}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;text-align:left}
+img{display:block;max-width:100%}
+
+.stage{height:100%;display:flex;align-items:center;justify-content:center}
+.device{position:relative;width:100%;height:100%;background:var(--app);overflow:hidden;
+  display:flex;flex-direction:column}
+@media (min-width:760px){
+  .stage{padding:22px}
+  .device{width:400px;height:min(860px,96vh);border-radius:40px;
+    box-shadow:0 0 0 9px #02475B,0 30px 70px rgba(0,0,0,.6)}
+}
+
+/* splash */
+/* Welcome: four staged beats, then the whole panel lifts away to reveal the app.
+   Long enough to register, short enough that nobody waits for it. */
+#splash{position:absolute;inset:0;z-index:90;background:var(--cta);color:#fff;display:flex;
+  flex-direction:column;align-items:center;justify-content:center;gap:12px;overflow:hidden}
+#splash:before{content:"";position:absolute;width:520px;height:520px;border-radius:50%;
+  background:rgba(255,255,255,.07);animation:ring 2.6s cubic-bezier(.2,.8,.3,1) both}
+#splash:after{content:"";position:absolute;width:340px;height:340px;border-radius:50%;
+  background:rgba(255,255,255,.07);animation:ring 2.6s .12s cubic-bezier(.2,.8,.3,1) both}
+@keyframes ring{0%{transform:scale(0);opacity:0}45%{opacity:1}100%{transform:scale(1);opacity:1}}
+#splash.gone{animation:so .62s cubic-bezier(.65,0,.35,1) forwards}
+@keyframes so{to{transform:translateY(-102%);visibility:hidden}}
+.sM{position:relative;z-index:2;width:92px;height:92px;border-radius:29px;background:#fff;
+  color:var(--cta);display:flex;align-items:center;justify-content:center;font-size:46px;
+  animation:si 1s cubic-bezier(.16,1.5,.4,1) both}
+@keyframes si{0%{transform:scale(.2) rotate(-14deg);opacity:0}
+  55%{transform:scale(1.07) rotate(3deg);opacity:1}100%{transform:none;opacity:1}}
+.sN{position:relative;z-index:2;font-size:21px;font-weight:800;letter-spacing:-.01em;
+  animation:su .6s .42s cubic-bezier(.2,.9,.3,1) both}
+.sS{position:relative;z-index:2;font-size:12px;opacity:.88;margin-top:-7px;
+  animation:su .6s .56s cubic-bezier(.2,.9,.3,1) both}
+@keyframes su{from{transform:translateY(16px);opacity:0}to{transform:none;opacity:1}}
+.sB{position:relative;z-index:2;width:132px;height:4px;border-radius:9px;
+  background:rgba(255,255,255,.26);overflow:hidden;margin-top:10px;animation:su .5s .7s both}
+.sB i{display:block;height:100%;border-radius:9px;background:#fff;
+  animation:sl 1.5s .78s cubic-bezier(.45,.05,.3,1) forwards}
+@keyframes sl{0%{width:0}55%{width:62%}100%{width:100%}}
+#replay{position:absolute;right:13px;bottom:calc(126px + env(safe-area-inset-bottom,0px));z-index:45;
+  width:42px;height:42px;border-radius:50%;background:#fff;color:var(--ink);font-size:16px;
+  display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(2,71,91,.22)}
+
+.scroll{flex:1;overflow-y:auto;overflow-x:hidden;padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+.pad{padding:0 14px}
+.screen{animation:in .26s cubic-bezier(.2,.9,.3,1) both}
+@keyframes in{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+
+/* Apollo header: white, not a coloured bar */
+.ahd{background:#fff;padding:calc(12px + env(safe-area-inset-top,0px)) 14px 13px;
+  border-bottom:1px solid var(--line)}
+.lrow{display:flex;align-items:center;gap:8px}
+.lrow .pin{font-size:15px;color:var(--cta)}
+.lrow .lb{font-size:10.5px;color:var(--ink-2);font-weight:600;line-height:1.2}
+.lrow .lv{font-size:13.5px;font-weight:700;line-height:1.25}
+.lrow .av{width:34px;height:34px;border-radius:50%;background:var(--green-50);color:var(--green);
+  display:flex;align-items:center;justify-content:center;font-size:15px;margin-left:auto;flex:none}
+.sbar{display:flex;align-items:center;gap:9px;background:var(--app);border:1px solid var(--line-2);
+  border-radius:9px;padding:11px 13px;margin-top:11px;font-size:13.5px;color:var(--ink-3)}
+.sbar .mic{margin-left:auto;color:var(--cta);font-size:15px}
+
+/* circular category rail */
+.cats{display:flex;gap:4px;padding:13px 10px 3px;overflow-x:auto;scrollbar-width:none;background:#fff}
+.cats::-webkit-scrollbar{display:none}
+.cats b{flex:none;width:72px;text-align:center;font-size:10px;font-weight:700;line-height:1.25;
+  color:var(--ink)}
+.cats i{display:flex;width:50px;height:50px;margin:0 auto 5px;border-radius:50%;font-style:normal;
+  align-items:center;justify-content:center;font-size:24px;background:var(--green-50)}
+.cats b:nth-child(2) i{background:var(--cta-50)}
+.cats b:nth-child(3) i{background:#E9F1FB}
+.cats b:nth-child(4) i{background:#FBEAF2}
+.cats b:nth-child(5) i{background:#F0EDFB}
+
+/* offer carousel */
+.carou{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;padding:0 14px;margin-top:14px}
+.carou::-webkit-scrollbar{display:none}
+.ban{flex:none;width:272px;border-radius:13px;padding:14px 15px;display:flex;gap:11px;
+  align-items:center;color:#fff}
+.ban.a{background:linear-gradient(110deg,#0A6E8A,#02475B)}
+.ban.b{background:linear-gradient(110deg,#1557B8,#1D6FE0)}
+.ban .ic{font-size:30px}
+.ban b{display:block;font-size:14px;font-weight:800}
+.ban span{font-size:11.5px;opacity:.9}
+.dots{display:flex;gap:5px;justify-content:center;margin-top:9px}
+.dots i{width:6px;height:6px;border-radius:50%;background:var(--line-2)}
+.dots i.on{width:16px;border-radius:9px;background:var(--cta)}
+
+/* section header */
+.sh{display:flex;align-items:center;margin:20px 0 10px}
+.sh h2{font-size:15px;font-weight:800;flex:1;letter-spacing:-.01em}
+.sh b{font-size:12px;font-weight:700;color:var(--cta)}
+
+/* "Book an appointment for" split */
+.split{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.split b{background:var(--card);border-radius:12px;padding:13px;display:block;
+  box-shadow:0 1px 3px rgba(2,71,91,.07)}
+.split .e{font-size:26px;display:block;margin-bottom:7px}
+.split .t{font-size:13px;font-weight:800;line-height:1.25}
+.split .s{font-size:10.5px;color:var(--ink-2);margin-top:2px}
+
+/* specialty grid, Apollo's 4-up with circular illustrations */
+.specs{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+.specs b{background:var(--card);border-radius:11px;padding:10px 3px 8px;text-align:center;display:block;
+  font-size:9.5px;font-weight:700;line-height:1.25;box-shadow:0 1px 3px rgba(2,71,91,.06)}
+.specs i{display:flex;width:40px;height:40px;margin:0 auto 5px;border-radius:50%;font-style:normal;
+  align-items:center;justify-content:center;font-size:21px;background:var(--app)}
+
+/* doctor card - Apollo's row with fee and orange CONSULT */
+.doc{background:var(--card);border-radius:13px;padding:13px;margin-bottom:10px;
+  box-shadow:0 1px 3px rgba(2,71,91,.07);display:flex;gap:12px}
+.doc .ph{width:56px;height:56px;border-radius:50%;background:var(--green-50);flex:none;display:flex;
+  align-items:center;justify-content:center;font-size:27px;position:relative}
+.doc .ph em{position:absolute;right:-1px;bottom:-1px;width:14px;height:14px;border-radius:50%;
+  background:var(--green);border:2.5px solid #fff}
+.doc .nm{font-size:14px;font-weight:800;letter-spacing:-.01em}
+.doc .sp{font-size:11.5px;color:var(--ink-2);margin-top:1px}
+.doc .mt{font-size:11px;color:var(--ink-3);margin-top:3px}
+.doc .rt{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:800;
+  background:var(--green-50);color:var(--green);padding:2px 7px;border-radius:5px;margin-top:6px}
+.doc .ft{display:flex;align-items:center;gap:9px;margin-top:9px}
+.doc .fee{font-size:13px;font-weight:800;color:var(--green)}
+.doc .fee s{color:var(--ink-3);font-weight:600;font-size:11.5px;margin-right:5px}
+.doc .cs{margin-left:auto;background:var(--cta);color:#fff;border-radius:7px;padding:8px 16px;
+  font-size:12.5px;font-weight:800}
+.docr{display:flex;gap:11px;overflow-x:auto;scrollbar-width:none;padding:0 14px;margin-inline:-14px}
+.docr::-webkit-scrollbar{display:none}
+.docr .doc{flex:none;width:232px;flex-direction:column;margin:0}
+.docr .doc .cs{margin-left:0;text-align:center;width:100%}
+.docr .doc .ft{flex-direction:column;align-items:stretch;gap:7px}
+
+.ihd{display:flex;align-items:center;gap:11px;background:#fff;
+  padding:calc(13px + env(safe-area-inset-top,0px)) 14px 12px;border-bottom:1px solid var(--line)}
+.bk{width:34px;height:34px;border-radius:50%;background:var(--app);display:flex;align-items:center;
+  justify-content:center;font-size:16px;flex:none}
+.ihd .t{font-size:16px;font-weight:800;flex:1;min-width:0}
+
+.card{background:var(--card);border-radius:13px;padding:14px;margin-top:11px;
+  box-shadow:0 1px 3px rgba(2,71,91,.07)}
+.row{display:flex;gap:10px;align-items:center}
+.sp1{flex:1;min-width:0}
+.sub{font-size:13px;color:var(--ink-2);line-height:1.5}
+.en{font-size:11px;color:var(--ink-3)}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:48px;
+  border-radius:9px;background:var(--cta);color:#fff;font-weight:800;font-size:15px}
+.btn:active{transform:scale(.977)}
+.btn.g{background:#fff;color:var(--cta);box-shadow:inset 0 0 0 1.6px var(--cta)}
+.btn.t{background:var(--ink)}
+.btn.w{background:var(--wa)}
+.btn.sm{min-height:38px;font-size:12.5px;border-radius:7px;width:auto;padding:0 15px}
+.pill{display:inline-flex;gap:4px;padding:3px 9px;border-radius:5px;font-size:10.5px;font-weight:800}
+.p-live{background:var(--green-50);color:var(--green)}
+.p-wait{background:var(--amber-50);color:var(--amber)}
+.p-red{background:var(--red-50);color:var(--red)}
+input,select,textarea{width:100%;min-height:46px;padding:12px 13px;font:inherit;font-size:14.5px;
+  background:#fff;border:1.5px solid var(--line-2);border-radius:9px;color:var(--ink)}
+textarea{min-height:80px;resize:none}
+label{display:block;font-size:12px;font-weight:800;color:var(--ink-2);margin:12px 0 6px}
+.chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.chips::-webkit-scrollbar{display:none}
+.chips b{flex:none;padding:8px 13px;border-radius:7px;background:#fff;font-size:12.5px;font-weight:700;
+  box-shadow:inset 0 0 0 1.5px var(--line-2);color:var(--ink-2)}
+.chips b.on{background:var(--ink);color:#fff;box-shadow:none}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.tile{background:#fff;border-radius:11px;padding:0;overflow:hidden;text-align:center;font-size:12px;
+  font-weight:700;box-shadow:inset 0 0 0 1.5px var(--line)}
+.tile img{width:100%;height:62px;object-fit:cover}
+.tile span{display:block;padding:7px 3px}
+.tile.on{box-shadow:inset 0 0 0 2.4px var(--cta)}
+.sk{height:13px;border-radius:6px;background:var(--line);position:relative;overflow:hidden}
+.sk+.sk{margin-top:9px}
+.sk:after{content:"";position:absolute;inset:0;transform:translateX(-100%);
+  background:linear-gradient(90deg,transparent,#fff,transparent);animation:sh 1.25s linear infinite}
+@keyframes sh{to{transform:translateX(100%)}}
+.rail{list-style:none;padding:0;margin:0}
+.rail li{position:relative;padding:0 0 15px 22px;font-size:12.5px}
+.rail li:before{content:"";position:absolute;left:2px;top:4px;width:9px;height:9px;border-radius:50%;
+  background:var(--green)}
+.rail li:after{content:"";position:absolute;left:6px;top:15px;bottom:0;width:1.5px;background:var(--line)}
+.rail li:last-child{padding-bottom:0}.rail li:last-child:after{display:none}
+.rail b{display:block}.rail span{font-size:10.5px;color:var(--ink-3)}
+.rail li.w:before{background:var(--line-2)}
+.seg{display:flex;gap:7px;overflow-x:auto;padding:10px 14px 2px;scrollbar-width:none;background:#fff;
+  border-bottom:1px solid var(--line)}
+.seg::-webkit-scrollbar{display:none}
+.seg b{flex:none;font-size:12.5px;font-weight:700;padding:7px 13px;border-radius:7px;background:var(--app);
+  color:var(--ink-2)}
+.seg b.on{background:var(--ink);color:#fff}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+td{padding:10px 5px 10px 0;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+.wd{background:var(--red-50);border:1.5px solid #F3D3D1;border-radius:10px;padding:11px;margin:11px 0}
+.wd .t{font-weight:800;color:var(--red);font-size:12.5px;margin-bottom:4px}
+.wd div{font-size:12px}.wd em{font-style:normal;font-weight:800;color:var(--red)}
+.rxrow{display:flex;gap:9px;padding:9px 0;border-bottom:1px solid var(--line);font-size:12.5px}
+.rxrow:last-child{border:0}
+.rxrow .n{width:14px;color:var(--ink-3);font-weight:800;flex:none}
+.rxrow .d{flex:none;width:68px;text-align:right;font-weight:800;font-size:11.5px}
+
+/* Apollo 5-tab bar */
+.nav{position:absolute;left:0;right:0;bottom:0;z-index:40;display:grid;grid-template-columns:repeat(5,1fr);
+  background:#fff;border-top:1px solid var(--line);
+  padding:6px 2px calc(6px + env(safe-area-inset-bottom,0px))}
+.nav b{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:9px;font-weight:700;
+  color:var(--ink-3);padding:3px 1px}
+.nav b i{font-style:normal;font-size:18px}
+.nav b.on{color:var(--cta)}
+.nav b.on i{filter:none}
+#index{position:absolute;inset:0;z-index:70;background:var(--app);display:flex;flex-direction:column;
+  animation:in .25s both}
+#index .hd{padding:calc(14px + env(safe-area-inset-top,0px)) 14px 9px;display:flex;align-items:center;gap:10px}
+#index .body{flex:1;overflow-y:auto;padding:0 14px 22px}
+.grp{font-size:10px;font-weight:800;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3);
+  margin:14px 0 7px}
+.ix{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ix b{background:#fff;border-radius:10px;padding:10px 11px;font-size:11.5px;font-weight:700;display:block;
+  line-height:1.3;box-shadow:0 1px 3px rgba(2,71,91,.06)}
+.ix b i{display:block;font-style:normal;font-size:9.5px;color:var(--ink-3);font-weight:500;margin-top:2px}
+#mapBtn{position:absolute;right:13px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:45;
+  width:42px;height:42px;border-radius:50%;background:var(--ink);color:#fff;font-size:15px;
+  display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(2,71,91,.3)}
+/* ---------------- motion ----------------
+   Everything that loads, waits or responds to a tap says so. */
+
+/* cards and rows arrive in sequence rather than all at once */
+.screen .card,.screen .doc,.screen .split b,.screen .specs b,.screen .ban{
+  animation:rise .34s cubic-bezier(.2,.9,.3,1) both}
+.screen .card:nth-child(2){animation-delay:.04s}
+.screen .card:nth-child(3){animation-delay:.08s}
+.screen .card:nth-child(4){animation-delay:.12s}
+.screen .card:nth-child(5){animation-delay:.16s}
+.screen .specs b:nth-child(2){animation-delay:.03s}
+.screen .specs b:nth-child(3){animation-delay:.06s}
+.screen .specs b:nth-child(4){animation-delay:.09s}
+.screen .specs b:nth-child(5){animation-delay:.12s}
+.screen .specs b:nth-child(6){animation-delay:.15s}
+.screen .specs b:nth-child(7){animation-delay:.18s}
+.screen .specs b:nth-child(8){animation-delay:.21s}
+@keyframes rise{from{opacity:0;transform:translateY(11px)}to{opacity:1;transform:none}}
+
+/* the category rail deals itself in */
+.cats b{animation:deal .4s cubic-bezier(.2,1.1,.35,1) both}
+.cats b:nth-child(2){animation-delay:.05s}
+.cats b:nth-child(3){animation-delay:.1s}
+.cats b:nth-child(4){animation-delay:.15s}
+.cats b:nth-child(5){animation-delay:.2s}
+@keyframes deal{from{opacity:0;transform:translateY(14px) scale(.85)}to{opacity:1;transform:none}}
+
+/* anything tappable answers the thumb */
+.card,.split b,.specs b,.cats b,.tile,.doc,.chips b,.seg b,.ban{transition:transform .11s ease}
+.card:active,.split b:active,.specs b:active,.cats b:active,.tile:active,.doc:active,
+.chips b:active,.seg b:active,.ban:active{transform:scale(.972)}
+
+/* a button that is working looks like it */
+.btn{position:relative;overflow:hidden}
+.btn.busy{pointer-events:none;color:transparent !important}
+.btn.busy:after{content:"";position:absolute;top:50%;left:50%;width:19px;height:19px;
+  margin:-9.5px 0 0 -9.5px;border-radius:50%;border:2.5px solid rgba(255,255,255,.35);
+  border-top-color:#fff;animation:spin .62s linear infinite}
+.btn.g.busy:after{border-color:rgba(29,111,224,.3);border-top-color:var(--cta)}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* inputs acknowledge focus */
+input,select,textarea{transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus,textarea:focus{outline:0;border-color:var(--cta);
+  box-shadow:0 0 0 3.5px var(--cta-50)}
+
+/* a chosen tile snaps */
+.tile.on{animation:snap .3s cubic-bezier(.2,1.5,.4,1)}
+@keyframes snap{0%{transform:scale(.94)}60%{transform:scale(1.04)}100%{transform:none}}
+
+/* toast for actions that have no screen of their own */
+#toast{position:absolute;left:50%;bottom:calc(94px + env(safe-area-inset-bottom,0px));z-index:60;
+  transform:translate(-50%,16px);opacity:0;background:var(--ink);color:#fff;font-size:13px;
+  font-weight:700;padding:11px 17px;border-radius:11px;pointer-events:none;
+  transition:opacity .22s,transform .22s;max-width:86%;text-align:center}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+
+/* live status dots actually pulse */
+.p-live:before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;
+  animation:blip 1.6s ease-in-out infinite}
+@keyframes blip{0%,100%{opacity:1}50%{opacity:.25}}
+
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="device">
+    <div id="splash">
+      <div class="sM">🐄</div>
+      <div class="sN">Jangaon Pashu Seva</div>
+      <div class="sS">Govt. Veterinary Care · Jangaon</div>
+      <div class="sB"><i></i></div>
+    </div>
+    <div class="scroll" id="scroll"><div id="view"></div></div>
+    <div id="nav"></div>
+    <div id="toast"></div>
+    <button id="replay" title="Replay the welcome">↻</button>
+    <button id="mapBtn">⠿</button>
+  </div>
+</div>
+
+<script>
+var TK = 'JPS-261009-004';
+function im(n) { return 'img/' + n + '.jpg'; }
+
+/* The user never picks. Their Gram Panchayat maps to one facility, and that facility
+   has an on-call roster. This is the real routing: SEED_GPS -> SEED_FACILITIES -> SEED_STAFF. */
+var CENTRE = {
+  code:'AH-01', name:'Area Veterinary Hospital', village:'Jangaon', km:'4.2',
+  hours:'8:00 am – 5:00 pm', phone:'+91 87654 32100',
+  incharge:'Dr Srinivas',
+  roster:[ { n:'Dr Srinivas', r:'In-charge', av:'👨‍⚕️', on:1 },
+           { n:'Dr Rajitha', r:'Assistant Surgeon', av:'👩‍⚕️', on:1 },
+           { n:'K. Kumaraswamy', r:'Attendant', av:'🧑‍🌾', on:0 } ]
+};
+/* A roster row, not a product card: no fee, no rating, no Consult button, because the
+   user is not choosing between them. */
+function staffRow(v) {
+  return '<div class="doc" style="margin-bottom:0;box-shadow:none;padding:11px 0;border-bottom:' +
+    '1px solid var(--line);border-radius:0">' +
+    '<div class="ph" style="width:44px;height:44px;font-size:21px">' + v.av +
+      (v.on ? '<em></em>' : '') + '</div>' +
+    '<div class="sp1"><div class="nm" style="font-size:13.5px">' + v.n + '</div>' +
+      '<div class="sp">' + v.r + '</div></div>' +
+    '<span class="pill ' + (v.on ? 'p-live">On duty' : 'p-wait">Off') + '</span></div>';
+}
+
+var SCREENS = {
+
+signin: function () { return ''+
+  '<div class="ahd" style="border:0;padding-bottom:22px">' +
+    '<div class="sM" style="width:56px;height:56px;border-radius:17px;font-size:27px;animation:none">🐄</div>' +
+    '<h1 style="font-size:21px;font-weight:800;margin-top:13px;line-height:1.25">' +
+    '<h1 style="font-size:21px;font-weight:800;margin-top:13px;line-height:1.25">' +
+      'Veterinary help for your animal,<br>one tap away</h1>' +
+    '<div class="sub" style="margin-top:5px">Government veterinary care &middot; completely free</div></div>' +
+  '<div class="pad"><div class="card" style="margin-top:4px">' +
+    '<label style="margin-top:0">Mobile number</label><input value="98765 00123" inputmode="numeric">' +
+    '<label>Your name</label><input value="Lachavva">' +
+    '<div style="height:13px"></div>' +
+    '<button class="btn" onclick="busy(this,800,function(){go(\'loc\')})">CONTINUE</button>' +
+    '<div class="en" style="text-align:center;margin-top:9px">No OTP needed</div></div>' +
+  '<button class="btn g" style="margin-top:10px" onclick="go(\'queue\')">Staff sign-in</button>' +
+  '<div style="height:18px"></div></div>'; },
+
+home: function () { return ''+
+  '<div class="ahd">' +
+    '<div class="lrow"><span class="pin">📍</span>' +
+      '<div onclick="go(\'loc\')"><div class="lb">Your Gram Panchayat</div>' +
+        '<div class="lv">Alimpur, Jangaon ▾</div></div>' +
+      '<div class="av">L</div></div>' +
+    '<div class="sbar">🔍 <span>Search your cases, prescriptions, tips</span><span class="mic">🎙</span></div>' +
+  '</div>' +
+  '<div class="cats">' +
+    [['🩺','Ask a vet','new1'],['📋','My cases','cases'],['🐄','My animals','records'],
+     ['💉','Vaccination','vacc'],['📗','Care tips','tips']]
+    .map(function (c) { return '<b onclick="go(\'' + c[2] + '\')"><i>' + c[0] + '</i>' + c[1] + '</b>'; }).join('') +
+  '</div>' +
+
+  '<div class="carou">' +
+    '<div class="ban a"><span class="ic">🩺</span><div><b>Free veterinary advice</b>' +
+      '<span>Government vets · 24×7</span></div></div>' +
+    '<div class="ban b"><span class="ic">💉</span><div><b>Free FMD vaccination</b>' +
+      '<span>20–24 October · all centres</span></div></div>' +
+  '</div>' +
+  '<div class="dots"><i class="on"></i><i></i></div>' +
+
+  '<div class="pad">' +
+    '<div class="card" style="border-left:3px solid var(--green)" onclick="go(\'track\')">' +
+      '<div class="row"><span class="pill p-live">Active</span><span class="sp1"></span>' +
+        '<span class="en">' + TK + '</span></div>' +
+      '<div style="font-size:14.5px;font-weight:800;margin-top:6px">Cow · Fever</div>' +
+      '<div class="en">Dr Srinivas · 18 min ago</div>' +
+      '<div class="row" style="margin-top:9px">' +
+        '<button class="btn sm w" onclick="event.stopPropagation();go(\'calling\')">📹 WhatsApp</button>' +
+        '<button class="btn sm g">Details</button></div></div>' +
+
+    '<div class="sh"><h2>Need advice?</h2></div>' +
+    '<div class="split">' +
+      '<b onclick="go(\'new1\')"><span class="e">📹</span><div class="t">Online advice</div>' +
+        '<div class="s">A vet calls you · 120 min</div></b>' +
+      '<b onclick="go(\'new1\')"><span class="e">🏥</span><div class="t">At the centre</div>' +
+        '<div class="s">The vet schedules a visit</div></b></div>' +
+
+    '<div class="sh"><h2>Your veterinary centre</h2><b onclick="go(\'centre\')">Details</b></div>' +
+    '<div class="card" onclick="go(\'centre\')">' +
+      '<div class="row"><span style="font-size:24px">🏥</span>' +
+        '<div class="sp1"><b style="font-size:14px">' + CENTRE.name + '</b>' +
+          '<div class="en">' + CENTRE.code + ' · ' + CENTRE.village + ' · ' + CENTRE.km + ' km</div></div>' +
+        '<span class="pill p-live">Open now</span></div>' +
+      '<div class="en" style="margin-top:9px;padding-top:9px;border-top:1px solid var(--line)">' +
+        'Assigned to your panchayat. You do not choose a centre or a doctor.</div>' +
+      '<div class="row" style="margin-top:8px">' +
+        '<div class="ph" style="width:34px;height:34px;border-radius:50%;background:var(--green-50);' +
+          'display:flex;align-items:center;justify-content:center;font-size:17px;flex:none">👨‍⚕️</div>' +
+        '<div class="sp1"><b style="font-size:12.5px">On duty now: ' + CENTRE.incharge + '</b>' +
+        '<div class="en">Average response 18 minutes</div></div></div></div>' +
+
+    '<div class="sh"><h2>Pick the problem</h2><b onclick="go(\'new1\')">All</b></div>' +
+    '<div class="specs">' +
+      [['🌡️','Fever'],['🍼','Mastitis'],['🐄','Calving trouble'],['🩹','Injury'],
+       ['🦠','Skin disease'],['😮‍💨','Bloat'],['🦟','Ticks'],['➕','Other']]
+      .map(function (s) { return '<b onclick="go(\'new1\')"><i>' + s[0] + '</i>' + s[1] + '</b>'; }).join('') +
+    '</div>' +
+
+    '<div class="sh"><h2>Animal care</h2><b onclick="go(\'tips\')">All</b></div>' +
+    '<div class="card" style="padding:0;overflow:hidden" onclick="go(\'tips\')">' +
+      '<img src="' + im('cow') + '" alt="" style="height:104px;width:100%;object-fit:cover">' +
+      '<div style="padding:12px"><b style="font-size:13.5px">What to do if there is fever</b>' +
+      '<div class="en">2 min read</div></div></div>' +
+    '<div style="height:16px"></div></div>'; },
+
+centre: function () { return ''+
+  '<div class="ihd"><button class="bk" onclick="go(\'home\')">←</button>' +
+    '<div class="t">Your centre</div><span class="pill p-live">Open now</span></div>' +
+  '<div class="pad">' +
+    '<div class="card"><div class="row"><span style="font-size:28px">🏥</span>' +
+      '<div class="sp1"><b style="font-size:15.5px">' + CENTRE.name + '</b>' +
+        '<div class="en">' + CENTRE.code + ' · ' + CENTRE.village + '</div></div></div>' +
+      '<table style="margin-top:10px">' +
+        '<tr><td class="en">Distance</td><td style="text-align:right"><b>' + CENTRE.km + ' km</b></td></tr>' +
+        '<tr><td class="en">Hours</td><td style="text-align:right"><b>' + CENTRE.hours + '</b></td></tr>' +
+        '<tr><td class="en">Phone</td><td style="text-align:right"><b>' + CENTRE.phone + '</b></td></tr>' +
+        '<tr><td class="en">Fee</td><td style="text-align:right">' +
+          '<b style="color:var(--green)">Free</b></td></tr></table>' +
+      '<div class="row" style="margin-top:11px">' +
+        '<button class="btn" onclick="go(\'new1\')">Ask a vet</button>' +
+        '<button class="btn g" style="width:auto;flex:none;padding:0 15px">🗺️</button></div></div>' +
+
+    '<div class="card" style="background:var(--cta-50);box-shadow:none">' +
+      '<div class="row" style="align-items:flex-start"><span style="font-size:18px">ℹ️</span>' +
+      '<div class="sub"><b>Why this centre?</b><br>' +
+      '<span class="en">Alimpur Gram Panchayat is mapped to ' + CENTRE.code + '. ' +
+      'You never pick a doctor &mdash; whoever is on duty that day takes your case.</span></div></div></div>' +
+
+    '<div class="sh"><h2>On duty today</h2><span class="en">9 Oct</span></div>' +
+    '<div class="card" style="padding:0 14px">' +
+      CENTRE.roster.map(function (v) { return staffRow(v); }).join('') + '</div>' +
+
+    '<div class="sh"><h2>Services here</h2></div>' +
+    '<div class="card"><table>' +
+      [['Treatment &amp; advice','Free'],['Artificial insemination','₹ 50'],
+       ['Vaccination','Free'],['Surgery','Free'],
+       ['Post-mortem','Free']].map(function (r) {
+        return '<tr><td>' + r[0] + '</td><td style="text-align:right"><b' +
+          (r[1] === 'Free' ? ' style="color:var(--green)"' : '') + '>' + r[1] + '</b></td></tr>';
+      }).join('') + '</table></div>' +
+    '<div style="height:16px"></div></div>'; },
+
+cases: function () { return ''+
+  '<div class="ihd"><div class="t">My cases</div></div>' +
+  '<div class="pad" style="padding-top:11px">' +
+    '<div class="chips"><b class="on">All</b><b>Active</b><b>Resolved</b></div>' +
+    '<div class="card" style="border-left:3px solid var(--green)" onclick="go(\'track\')">' +
+      '<div class="row"><span class="pill p-live">Active</span><span class="sp1"></span>' +
+        '<span class="en">' + TK + '</span></div>' +
+      '<div style="font-size:14px;font-weight:800;margin-top:5px">Cow · Fever</div>' +
+      '<div class="en">Dr Srinivas · 9 Oct 10:04</div></div>' +
+    '<div class="card" onclick="go(\'rx\')">' +
+      '<div class="row"><span class="pill p-live">Resolved</span><span class="sp1"></span>' +
+        '<span class="en">JPS-260928-017</span></div>' +
+      '<div style="font-size:14px;font-weight:800;margin-top:5px">Buffalo · Mastitis</div>' +
+      '<div class="en">Dr Rajitha · 28 Sep · prescription issued</div></div>' +
+    '<div class="card" style="opacity:.75">' +
+      '<div class="row"><span class="pill p-wait">Cancelled</span><span class="sp1"></span>' +
+        '<span class="en">JPS-260915-008</span></div>' +
+      '<div style="font-size:14px;font-weight:800;margin-top:5px">Goat · Limping</div>' +
+      '<div class="en">You cancelled · 15 Sep</div></div>' +
+    '<div style="height:16px"></div></div>'; },
+
+vacc: function () { return ''+
+  '<div class="ihd"><button class="bk" onclick="go(\'home\')">←</button>' +
+    '<div class="t">Vaccination</div></div>' +
+  '<div class="pad" style="padding-top:11px">' +
+    '<div class="card" style="background:var(--cta-50);box-shadow:none;display:flex;gap:11px">' +
+      '<span style="font-size:24px">💉</span><div class="sub"><b>Free FMD vaccination</b><br>' +
+      '<span class="en">20–24 October · ' + CENTRE.name + ' · bring the ear tag</span></div></div>' +
+    '<div class="sh"><h2>Vaccinations due</h2></div>' +
+    '<div class="card"><div class="row"><span style="font-size:22px">🐄</span>' +
+      '<div class="sp1"><b style="font-size:13.5px">Cow · Tag 9012345678</b>' +
+      '<div class="en">FMD · last 12 Aug</div></div>' +
+      '<span class="pill p-wait">Due Feb</span></div></div>' +
+    '<div class="card"><div class="row"><span style="font-size:22px">🐃</span>' +
+      '<div class="sp1"><b style="font-size:13.5px">Buffalo · Tag 9012349999</b>' +
+      '<div class="en">FMD · last 2 Mar</div></div>' +
+      '<span class="pill p-red">Overdue</span></div></div>' +
+    '<div style="height:16px"></div></div>'; },
+
+loc: function () { return ''+
+  '<div class="ihd"><div class="t">Where is your animal?</div></div>' +
+  '<div class="pad" style="padding-top:14px">' +
+    '<div class="card" style="text-align:center;padding:20px 15px">' +
+      '<div style="width:64px;height:64px;border-radius:50%;background:var(--cta-50);color:var(--cta);' +
+        'display:flex;align-items:center;justify-content:center;font-size:30px;margin:0 auto;' +
+        'animation:pulseLoc 1.8s ease-in-out infinite">📍</div>' +
+      '<style>@keyframes pulseLoc{0%,100%{box-shadow:0 0 0 0 rgba(29,111,224,.25)}' +
+        '50%{box-shadow:0 0 0 16px rgba(29,111,224,0)}}</style>' +
+      '<div style="font-size:15px;font-weight:800;margin-top:12px">Use my current location</div>' +
+      '<div class="sub" style="margin-top:3px">We find your Gram Panchayat and the centre it is ' +
+        'mapped to.</div>' +
+      '<button class="btn" style="margin-top:13px" onclick="detectLoc()" id="locbtn">' +
+        'ALLOW LOCATION</button>' +
+      '<div id="locout" style="margin-top:11px"></div></div>' +
+
+    '<div class="row" style="margin:14px 0"><div style="flex:1;height:1px;background:var(--line)">' +
+      '</div><span class="en">or choose it yourself</span>' +
+      '<div style="flex:1;height:1px;background:var(--line)"></div></div>' +
+
+    '<div class="card"><label style="margin-top:0">Mandal</label>' +
+      '<select><option>Jangaon</option><option>Palakurthy</option><option>Devaruppula</option>' +
+        '<option>Zaffergadh</option></select>' +
+      '<label>Gram Panchayat</label>' +
+      '<select><option>Alimpur</option><option>Kodavatur</option><option>Chennaram</option></select>' +
+      '<label>Village / habitation</label><input value="Alimpur" placeholder="Village">' +
+      '<div style="height:13px"></div>' +
+      '<button class="btn" onclick="busy(this,700,function(){toast(\'Location saved\');go(\'home\')})">SAVE &amp; CONTINUE</button></div>' +
+
+    '<div class="card" style="background:var(--cta-50);box-shadow:none">' +
+      '<div class="row" style="align-items:flex-start"><span style="font-size:17px">ℹ️</span>' +
+      '<div class="sub"><b>Asked once, then remembered.</b><br>' +
+      '<span class="en">It is saved to your profile and reused on every request. You can change it ' +
+      'from the pin on the home screen. The panchayat decides which centre and which on-duty vet ' +
+      'gets your case.</span></div></div></div>' +
+    '<div style="height:16px"></div></div>'; },
+
+new1: function () { return ''+
+  '<div class="ihd"><button class="bk" onclick="go(\'home\')">←</button>' +
+    '<div class="t">Which animal?</div><span class="en">1/3</span></div>' +
+  '<div class="pad" style="padding-top:13px"><div class="tiles">' +
+    [['cow','Cow'],['buffalo','Buffalo'],['goat','Goat'],['sheep','Sheep'],['poultry','Poultry'],['dog','Dog']]
+    .map(function (t, i) { return '<div class="tile' + (i === 0 ? ' on' : '') + '" onclick="pick(this)">' +
+      '<img src="' + im(t[0]) + '" alt=""><span>' + t[1] + '</span></div>'; }).join('') +
+  '</div>' +
+  '<div class="card"><div class="row"><span style="font-size:20px">🏷️</span>' +
+    '<div class="sp1"><b style="font-size:13px">Tag 9012345678</b>' +
+    '<div class="en">Last visit 28 Sep · mastitis</div></div><span class="en">Change</span></div></div>' +
+  '<div style="height:14px"></div><button class="btn" onclick="go(\'new2\')">NEXT</button>' +
+  '<div style="height:16px"></div></div>'; },
+
+new2: function () { return ''+
+  '<div class="ihd"><button class="bk" onclick="go(\'new1\')">←</button>' +
+    '<div class="t">What is wrong?</div><span class="en">2/3</span></div>' +
+  '<div class="pad" style="padding-top:13px">' +
+    '<div class="chips"><b class="on">Fever</b><b>Calving trouble</b><b>Mastitis</b><b>Injury</b></div>' +
+    '<div class="card" style="background:var(--amber-50);box-shadow:none;display:flex;gap:10px">' +
+      '<span style="font-size:17px">⏱️</span><div class="sub"><b>Target response 120 minutes</b></div></div>' +
+    '<label>Details</label><textarea>Not eating since last night</textarea>' +
+    '<label>Photo</label>' +
+    '<button class="btn g" style="justify-content:flex-start;padding-inline:13px">📷 Take a photo</button>' +
+    '<div class="card" style="background:var(--red-50);box-shadow:none;display:flex;gap:10px">' +
+      '<input type="checkbox" style="width:20px;min-height:20px;flex:none">' +
+      '<div class="sub"><b style="color:var(--red)">Emergency</b></div></div>' +
+    '<div style="height:13px"></div><button class="btn" onclick="go(\'new3\')">NEXT</button>' +
+    '<div style="height:16px"></div></div>'; },
+
+new3: function () { return ''+
+  '<div class="ihd"><button class="bk" onclick="go(\'new2\')">←</button>' +
+    '<div class="t">Where?</div><span class="en">3/3</span></div>' +
+  '<div class="pad" style="padding-top:13px">' +
+    '<label style="margin-top:0">Mandal</label><select><option>Jangaon</option></select>' +
+    '<label>Gram Panchayat</label><select><option>Alimpur</option></select>' +
+    '<button class="btn g" style="margin-top:12px;justify-content:flex-start;padding-inline:13px">' +
+      '📍 Attach my location</button>' +
+    '<div class="card"><div class="row"><span style="font-size:20px">🏥</span>' +
+      '<div class="sp1"><b style="font-size:13px">AH-01 · Area Veterinary Hospital</b>' +
+      '<div class="en">Your nearest centre · 4.2 km</div></div></div></div>' +
+    '<div style="height:13px"></div><button class="btn" onclick="busy(this,600,submitReq)">SUBMIT REQUEST</button>' +
+    '<div style="height:16px"></div></div>'; },
+
+sending: function () { return ''+
+  '<div class="pad" style="padding-top:34px">' +
+    '<div class="card"><div class="sk" style="width:52%"></div><div class="sk"></div>' +
+      '<div class="sk" style="width:72%"></div></div>' +
+    '<div class="card"><div class="sk" style="width:38%"></div><div class="sk"></div></div>' +
+    '<p class="sub" style="text-align:center;margin-top:15px">Sending…</p></div>'; },
+
+sent: function () { return ''+
+  '<div class="pad" style="padding-top:32px;text-align:center">' +
+    '<div style="width:70px;height:70px;border-radius:50%;background:var(--green-50);color:var(--green);' +
+      'display:flex;align-items:center;justify-content:center;font-size:34px;margin:0 auto;' +
+      'animation:si .7s cubic-bezier(.2,1.6,.4,1) both">✓</div>' +
+    '<h1 style="font-size:20px;font-weight:800;margin-top:13px">Request filed</h1>' +
+    '<p class="sub">Dr Srinivas will call you shortly</p>' +
+    '<div class="card"><div class="en">Request token</div>' +
+      '<div style="font-size:23px;font-weight:800">' + TK + '</div></div>' +
+    '<button class="btn" style="margin-top:12px" onclick="go(\'track\')">TRACK REQUEST</button>' +
+    '<button class="btn g" style="margin-top:9px" onclick="go(\'home\')">HOME</button></div>'; },
+
+track: function () { return ''+
+  '<div class="ihd"><button class="bk" onclick="go(\'home\')">←</button>' +
+    '<div class="t">' + TK + '</div><span class="pill p-live">● ACTIVE</span></div>' +
+  '<div class="pad">' +
+    '<div class="card"><div style="font-size:15px;font-weight:800">Cow · Fever</div>' +
+      '<div class="en">Tag 9012345678 · Alimpur, Jangaon</div></div>' +
+    '<div class="card"><div class="row">' +
+      '<div class="ph" style="width:48px;height:48px;border-radius:50%;background:var(--green-50);' +
+        'display:flex;align-items:center;justify-content:center;font-size:23px;flex:none">👨‍⚕️</div>' +
+      '<div class="sp1"><b style="font-size:13.5px">Dr Srinivas</b>' +
+        '<div class="en">AH-01 · Reg. TSVC/2019/4471</div></div></div>' +
+      '<div class="row" style="margin-top:10px">' +
+        '<button class="btn w" onclick="go(\'calling\')">📹 WhatsApp video</button>' +
+        '<button class="btn g" style="width:auto;flex:none;padding:0 14px">📞</button></div></div>' +
+    '<div class="card"><b style="font-size:13.5px">Progress</b><div style="height:9px"></div>' +
+      '<ul class="rail"><li><b>Filed</b><span>10:04 AM</span></li>' +
+      '<li><b>Doctor assigned</b><span>10:11 AM</span></li>' +
+      '<li><b>WhatsApp video call</b><span>10:19 AM</span></li>' +
+      '<li class="w"><b>Resolution</b><span>Awaiting</span></li></ul></div>' +
+    '<button class="btn g" style="margin-top:11px" onclick="go(\'rx\')">💊 Prescription</button>' +
+    '<div style="height:16px"></div></div>'; },
+
+calling: function () { return ''+
+  '<div class="ihd"><button class="bk" onclick="go(\'track\')">←</button><div class="t"></div></div>' +
+  '<div class="pad" style="padding-top:32px;text-align:center">' +
+    '<div style="width:80px;height:80px;border-radius:50%;background:var(--wa);color:#04210F;font-size:36px;' +
+      'display:flex;align-items:center;justify-content:center;margin:0 auto;animation:pl 1.4s infinite">📹</div>' +
+    '<style>@keyframes pl{0%,100%{box-shadow:0 0 0 0 rgba(37,211,102,.4)}50%{box-shadow:0 0 0 18px rgba(37,211,102,0)}}</style>' +
+    '<h1 style="font-size:19px;font-weight:800;margin-top:15px">Opening WhatsApp</h1>' +
+    '<p class="sub" style="margin-top:4px">Tap the 📹 icon at the top of the chat</p>' +
+    '<div class="card" style="text-align:left"><div class="sub"><b>It rings even on a locked phone.</b>' +
+      '<br><span class="en">That is why the call is on WhatsApp, not inside the app.</span></div></div>' +
+    '<button class="btn g" style="margin-top:12px" onclick="go(\'track\')">BACK</button></div>'; },
+
+rx: function () { return ''+
+  '<div class="ihd"><button class="bk" onclick="go(\'track\')">←</button>' +
+    '<div class="t">Prescription</div><span class="en">RX-261009-004</span></div>' +
+  '<div class="pad"><div class="card">' +
+    '<div style="border-bottom:2px solid var(--ink);padding-bottom:9px;margin-bottom:11px">' +
+      '<div class="en">Veterinary &amp; AH Dept, Jangaon</div>' +
+      '<div style="font-weight:800;font-size:14px">Area Veterinary Hospital</div>' +
+      '<div class="row"><b style="font-size:12.5px">Dr Srinivas</b><span class="sp1"></span>' +
+        '<span class="en">Reg. TSVC/2019/4471</span></div></div>' +
+    '<div style="background:var(--app);border-radius:9px;padding:10px;margin-bottom:11px">' +
+      '<div class="row" style="font-size:12px"><span>Lachavva</span><span class="sp1"></span>' +
+        '<span>410 kg · 39.8 °C</span></div>' +
+      '<div class="en" style="margin-top:2px">Cow · Tag 9012345678</div></div>' +
+    '<div class="en" style="font-weight:800;letter-spacing:.06em">DIAGNOSIS</div>' +
+    '<p style="font-size:12.5px;margin:4px 0 11px">Clinical mastitis, left hind quarter</p>' +
+    '<div class="en" style="font-weight:800;letter-spacing:.06em">Rx · MEDICINES</div>' +
+    '<div class="rxrow"><span class="n">1</span><div class="sp1"><b>Inj. Enrofloxacin 10%</b>' +
+      '<div class="en">10 ml · IM</div></div><div class="d">1-0-0<br><span class="en">3 days</span></div></div>' +
+    '<div class="rxrow"><span class="n">2</span><div class="sp1"><b>Intramammary tube</b>' +
+      '<div class="en">1 tube</div></div><div class="d">1-0-1<br><span class="en">3 days</span></div></div>' +
+    '<div class="wd"><div class="t">⚠️ Withdrawal period</div>' +
+      '<div><em>96 hours</em> — do not use or sell milk</div>' +
+      '<div><em>14 days</em> — do not send for meat</div>' +
+      '<div class="en" style="margin-top:4px">counted from the last dose</div></div>' +
+    '<div class="en" style="border-top:1px dashed var(--line);margin-top:11px;padding-top:8px">' +
+      'Issued electronically · valid without a physical signature</div></div>' +
+    '<div style="height:16px"></div></div>'; },
+
+records: function () { return ''+
+  '<div class="ihd"><div class="t">My animals · Records</div></div>' +
+  '<div class="pad" style="padding-top:11px">' +
+    ['cow|Cow|Tag 9012345678|5 yrs · 410 kg|1','buffalo|Buffalo|Tag 9012349999|7 yrs · 520 kg|0']
+    .map(function (s) { var a = s.split('|');
+      return '<div class="card" style="padding:0;overflow:hidden;margin-top:11px">' +
+        '<div style="display:flex;gap:11px;padding:12px;align-items:center">' +
+        '<div style="width:50px;height:50px;border-radius:11px;overflow:hidden;flex:none">' +
+          '<img src="' + im(a[0]) + '" alt="" style="width:100%;height:100%;object-fit:cover"></div>' +
+        '<div class="sp1"><b style="font-size:14px">' + a[1] + '</b>' +
+          '<div class="en">' + a[2] + ' · ' + a[3] + '</div></div>' +
+        (a[4] === '1' ? '<span class="pill p-live">● ACTIVE</span>' : '') + '</div>' +
+        (a[4] === '1' ? '<div style="padding:0 12px 12px"><table>' +
+          '<tr><td><b>9 Oct</b><br><span class="en">Fever · Dr Srinivas</span></td>' +
+          '<td style="text-align:right"><button class="btn sm g" onclick="go(\'rx\')">Slip</button></td></tr>' +
+      '<tr><td><b>28 Sep</b><br><span class="en">Mastitis</span></td>' +
+          '<td style="text-align:right"><button class="btn sm g" onclick="go(\'rx\')">Slip</button></td></tr>' +
+          '<tr><td><b>12 Aug</b><br><span class="en">FMD</span></td>' +
+          '<td style="text-align:right"><span class="en">—</span></td></tr></table></div>' : '') +
+      '</div>'; }).join('') +
+    '<button class="btn g" style="margin-top:11px">+ Add an animal</button>' +
+    '<div style="height:16px"></div></div>'; },
+
+tips: function () { return ''+
+  '<div class="ihd"><div class="t">Animal care</div></div>' +
+  '<div class="pad" style="padding-top:11px">' +
+    '<div class="chips"><b class="on">All</b><b>Cow</b><b>Buffalo</b><b>Goat</b></div>' +
+    [['cow','If there is fever','Keep it in shade and give cool water. Do not give any medicine unless a vet says so.'],
+     ['buffalo','If milk drops','Check for mastitis and file a request straight away.'],
+     ['goat','During calving','If it has been more than 2 hours, this is an emergency - call 1962.']]
+    .map(function (t) { return '<div class="card" style="padding:0;overflow:hidden">' +
+      '<img src="' + im(t[0]) + '" alt="" style="height:106px;width:100%;object-fit:cover">' +
+      '<div style="padding:12px"><b style="font-size:13.5px">' + t[1] + '</b>' +
+      '<div class="sub" style="margin-top:3px">' + t[2] + '</div></div></div>'; }).join('') +
+    '<div style="height:16px"></div></div>'; },
+
+emg: function () { return ''+
+  '<div class="ihd"><button class="bk" onclick="go(\'home\')">←</button><div class="t"></div></div>' +
+  '<div class="pad" style="padding-top:22px;text-align:center">' +
+    '<div style="font-size:48px">🚑</div>' +
+    '<h1 style="font-size:20px;font-weight:800;margin-top:8px">Emergency help</h1>' +
+    '<p class="sub">State animal ambulance · free, 24 hours</p>' +
+    '<div class="card" style="background:var(--red);color:#fff">' +
+      '<div style="font-size:12px;opacity:.9">Call now</div>' +
+      '<div style="font-size:40px;font-weight:800">1962</div></div>' +
+    '<p class="sub" style="margin-top:10px">Difficult calving · severe injury · poisoning</p></div>'; },
+
+/* staff */
+queue: function () { return ''+
+  '<div class="ihd"><div class="t">Duty console</div><span class="pill p-live">On call</span></div>' +
+  seg('queue') +
+  '<div class="pad" style="padding-top:11px">' +
+    '<div class="card" style="background:var(--amber-50);box-shadow:none">' +
+      '<b style="font-size:13px">Add your registration number</b>' +
+      '<div class="en">It prints on every prescription.</div>' +
+      '<div class="row" style="margin-top:8px"><input value="TSVC/2019/4471" style="min-height:38px">' +
+        '<button class="btn sm">SAVE</button></div></div>' +
+    '<div class="card"><b style="font-size:13.5px">Open · 2</b><table style="margin-top:8px">' +
+      '<tr onclick="go(\'case\')"><td><b>' + TK + '</b> <span class="pill p-red">EMG</span>' +
+        '<br><span class="en">Cow · Fever · 18 min</span></td>' +
+        '<td style="text-align:right"><button class="btn sm">CLAIM</button></td></tr>' +
+      '<tr><td><b>JPS-261009-003</b><br><span class="en">Buffalo &middot; mastitis &middot; 42 min</span></td>' +
+        '<td style="text-align:right"><button class="btn sm g">OPEN</button></td></tr></table></div>' +
+    '<div class="card"><div class="row">' +
+      ['6|Claimed','4|Resolved','1|Visits','0|Breach'].map(function (s) { var a = s.split('|');
+        return '<div style="flex:1"><div style="font-size:18px;font-weight:800">' + a[0] +
+          '</div><div class="en">' + a[1] + '</div></div>'; }).join('') + '</div></div>' +
+    '<div style="height:16px"></div></div>'; },
+
+case: function () { return ''+
+  '<div class="ihd"><button class="bk" onclick="go(\'queue\')">←</button><div class="t">' + TK + '</div></div>' +
+  '<div class="pad">' +
+    '<div class="card" style="padding:0;overflow:hidden">' +
+      '<img src="' + im('cow') + '" alt="" style="height:112px;width:100%;object-fit:cover">' +
+      '<div style="padding:13px"><div style="font-size:15px;font-weight:800">Cow · Fever</div>' +
+      '<div class="sub">Not eating since last night</div>' +
+      '<div class="en">Lachavva · +91 98765 00123 · Alimpur</div>' +
+      '<div class="row" style="margin-top:10px">' +
+        '<button class="btn w" onclick="go(\'calling\')">📹 WhatsApp video</button>' +
+        '<button class="btn g" style="width:auto;flex:none;padding:0 14px">📞</button></div></div></div>' +
+    '<div class="card"><label style="margin-top:0">Observation &amp; diagnosis</label>' +
+      '<textarea>Clinical mastitis, left hind quarter</textarea>' +
+      '<div class="row" style="margin-top:10px">' +
+        '<div style="flex:1"><label style="margin-top:0">Weight</label><input value="410"></div>' +
+        '<div style="flex:1"><label style="margin-top:0">Temp</label><input value="39.8"></div></div>' +
+      '<div style="height:12px"></div><button class="btn" onclick="go(\'prescribe\')">💊 PRESCRIBE</button></div>' +
+    '<div class="card"><div class="row">' +
+      '<button class="btn sm" style="flex:1;background:var(--green)">GREEN</button>' +
+      '<button class="btn sm" style="flex:1">AMBER</button>' +
+      '<button class="btn sm" style="flex:1;background:var(--red)">RED</button></div></div>' +
+    '<div style="height:16px"></div></div>'; },
+
+prescribe: function () { return ''+
+  '<div class="ihd"><button class="bk" onclick="go(\'case\')">←</button><div class="t">Prescription</div></div>' +
+  '<div class="pad"><div class="card">' +
+    '<input value="Inj. Enrofloxacin 10%">' +
+    '<div class="row" style="margin-top:8px"><input value="10 ml"><select><option>IM</option></select></div>' +
+    '<div class="row" style="margin-top:8px"><select><option>1-0-0</option></select><input value="3"></div>' +
+    '<div class="row" style="margin-top:8px">' +
+      '<input value="84" style="background:var(--red-50)"><input value="14" style="background:var(--red-50)"></div>' +
+    '<label style="display:flex;gap:8px;align-items:center;margin-top:9px">' +
+      '<input type="checkbox" style="width:19px;min-height:19px"> No withholding needed</label></div>' +
+  '<button class="btn g" style="margin-top:9px">+ ADD MEDICINE</button>' +
+  '<div class="card" style="background:var(--red-50);box-shadow:none"><div class="sub">' +
+    '<b style="color:var(--red)">A withholding time cannot be skipped.</b><br>' +
+    '<span class="en">The slip prints the longest, never the sum.</span></div></div>' +
+  '<div style="height:12px"></div><button class="btn" onclick="busy(this,900,function(){toast(\'Prescription issued\');go(\'rx\')})">ISSUE &amp; RESOLVE</button>' +
+  '<div style="height:16px"></div></div>'; },
+
+attend: function () { return ''+
+  '<div class="ihd"><div class="t">Attendance</div></div>' + seg('attend') +
+  '<div class="pad" style="padding-top:11px"><div class="card" style="text-align:center">' +
+    '<div style="aspect-ratio:4/3;border-radius:10px;background:var(--navy);color:#fff;display:flex;' +
+      'align-items:center;justify-content:center;font-size:30px">📷</div>' +
+    '<div class="sub" style="margin-top:9px">Live camera only.</div>' +
+    '<span class="pill p-live" style="margin-top:6px">📍 182 m from AH-01</span>' +
+    '<button class="btn" style="margin-top:11px">CHECK IN</button></div>' +
+  '<div class="card"><table>' +
+    '<tr><td>Wed 8 Oct<br><span class="en">09:12 – 17:40</span></td>' +
+      '<td style="text-align:right"><span class="pill p-live">204 m</span></td></tr>' +
+    '<tr><td>Tue 7 Oct<br><span class="en">09:04 – 17:22</span></td>' +
+      '<td style="text-align:right"><span class="pill p-live">96 m</span></td></tr></table></div>' +
+  '<div style="height:16px"></div></div>'; },
+
+stock: function () { return ''+
+  '<div class="ihd"><div class="t">Medicine stock</div></div>' + seg('stock') +
+  '<div class="pad" style="padding-top:11px"><div class="card">' +
+    '<select><option>AH-01 — Area Veterinary Hospital</option></select>' +
+    '<table style="margin-top:10px">' +
+    '<tr><td><b>Inj. Enrofloxacin</b><br><span class="en">VDM-80</span></td>' +
+      '<td style="text-align:right"><b>25</b></td></tr>' +
+    '<tr style="background:var(--red-50)"><td><b>Intramammary tube</b><br><span class="en">VDM-164</span></td>' +
+      '<td style="text-align:right"><b style="color:var(--red)">3</b></td></tr>' +
+    '<tr><td><b>Calcium bolus</b><br><span class="en">VDM-284</span></td>' +
+      '<td style="text-align:right"><b>48</b></td></tr></table>' +
+    '<div class="en" style="margin-top:8px">Red is at or under reorder level.</div></div>' +
+  '<div style="height:16px"></div></div>'; },
+
+dash: function () { return ''+
+  '<div class="ihd"><div class="t">District dashboard</div></div>' + seg('dash') +
+  '<div class="pad" style="padding-top:11px"><div class="card"><div class="row">' +
+    [['182','','Requests'],['94','%','Resolved'],['38','m','Avg'],['3','','Breach']]
+      .map(function (a) {
+      return '<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:800" ' +
+        'data-count="' + a[0] + '" data-suf="' + a[1] + '">0</div>' +
+        '<div class="en">' + a[2] + '</div></div>'; }).join('') + '</div></div>' +
+  '<div class="card"><b style="font-size:13.5px">By mandal</b><div style="height:9px"></div>' +
+    [['Jangaon',46],['Palakurthy',31],['Devaruppula',24],['Zaffergadh',18]]
+      .map(function (m) { return '<div style="margin-bottom:8px"><div class="row" style="font-size:12px">' +
+        '<span>' + m[0] + '</span><span class="sp1"></span><b>' + m[1] + '</b></div>' +
+        '<div style="height:6px;border-radius:9px;background:var(--app);margin-top:3px">' +
+        '<div style="height:100%;width:' + (m[1] / 46 * 100) + '%;border-radius:9px;' +
+        'background:var(--cta)"></div></div></div>'; }).join('') + '</div>' +
+  '<div class="card"><b style="font-size:13.5px">Duty vets · 11</b><table style="margin-top:8px">' +
+    '<tr><td><b>Dr Srinivas</b><br><span class="en">AH-01 · 6 open</span></td>' +
+      '<td style="text-align:right"><span class="pill p-live">On call</span></td></tr>' +
+    '<tr><td><b>Dr Rajitha</b><br><span class="en">VD-22 · 2 open</span></td>' +
+      '<td style="text-align:right"><span class="pill p-wait">Off</span></td></tr></table></div>' +
+  '<div style="height:16px"></div></div>'; },
+
+broadcast: function () { return ''+
+  '<div class="ihd"><div class="t">Broadcasts</div></div>' + seg('broadcast') +
+  '<div class="pad" style="padding-top:11px"><div class="card">' +
+    '<label style="margin-top:0">Title</label><input value="FMD vaccination drive">' +
+    '<label>Details</label><textarea>Free FMD vaccination at all centres, 20–24 October.</textarea>' +
+    '<div style="height:12px"></div><button class="btn">PUBLISH</button></div>' +
+  '<div class="card" style="background:var(--cta-50)"><b style="font-size:13px">FMD vaccination drive</b>' +
+    '<div class="sub">Free FMD vaccination at all centres, 20–24 October.</div>' +
+    '<button class="btn sm g" style="margin-top:8px">END</button></div>' +
+  '<div style="height:16px"></div></div>'; }
+};
+
+function seg(cur) {
+  var it = [['queue','Queue'],['dash','Dashboard'],['attend','Attendance'],['stock','Stock'],
+            ['broadcast','Broadcasts']];
+  return '<div class="seg">' + it.map(function (i) {
+    return '<b class="' + (cur === i[0] ? 'on' : '') + '" onclick="go(\'' + i[0] + '\')">' + i[1] + '</b>';
+  }).join('') + '</div>';
+}
+
+var FNAV = [['home','🏠','Home'],['cases','📋','My cases'],['new1','➕','Ask'],
+            ['records','🐄','My animals'],['emg','🚑','1962']];
+var FARMER = ['home','centre','cases','vacc','new1','new2','new3','sent','track','rx','tips',
+              'emg','calling','records','sending'];
+function paintNav(id) {
+  var show = FARMER.indexOf(id) >= 0;
+  document.getElementById('nav').innerHTML = show ? '<div class="nav">' + FNAV.map(function (n) {
+    return '<b class="' + (n[0] === id ? 'on' : '') + '" onclick="go(\'' + n[0] + '\')"><i>' +
+      n[1] + '</i>' + n[2] + '</b>'; }).join('') + '</div>' : '';
+  document.getElementById('mapBtn').style.display = id === 'signin' ? 'none' : 'flex';
+}
+/* Screens that fetch show their skeleton first. Forms do not - a shimmer in front of a
+   field the user is about to type in is just a delay wearing a costume. */
+var FETCHES = ['home','centre','cases','track','rx','records','vacc','tips','queue','case',
+               'dash','attend','stock','broadcast'];
+function skeleton() {
+  return '<div class="pad" style="padding-top:16px">' +
+    '<div class="card"><div class="sk" style="width:46%"></div><div class="sk"></div>' +
+      '<div class="sk" style="width:72%"></div></div>' +
+    '<div class="card"><div class="sk" style="width:58%"></div><div class="sk"></div></div>' +
+    '<div class="card"><div class="sk" style="width:38%"></div><div class="sk"></div>' +
+      '<div class="sk" style="width:64%"></div></div></div>';
+}
+/* the offer rail moves on its own, and the dots follow it */
+function autoCarousel() {
+  var c = document.querySelector('.carou');
+  if (!c) return;
+  clearInterval(window._car);
+  window._car = setInterval(function () {
+    if (!document.body.contains(c)) { clearInterval(window._car); return; }
+    var w = c.firstElementChild ? c.firstElementChild.offsetWidth + 10 : 280;
+    var next = c.scrollLeft + w >= c.scrollWidth - 20 ? 0 : c.scrollLeft + w;
+    c.scrollTo({ left: next, behavior: 'smooth' });
+    var d = document.querySelectorAll('.dots i'), k = Math.round(next / w);
+    for (var i = 0; i < d.length; i++) d[i].className = i === k ? 'on' : '';
+  }, 3200);
+}
+
+/* dashboard figures count up instead of just appearing */
+function countUp() {
+  var els = document.querySelectorAll('[data-count]');
+  for (var i = 0; i < els.length; i++) (function (el) {
+    var to = parseFloat(el.getAttribute('data-count')), suf = el.getAttribute('data-suf') || '';
+    var t0 = Date.now();
+    var tick = function () {
+      var k = Math.min(1, (Date.now() - t0) / 700);
+      el.textContent = Math.round(to * (1 - Math.pow(1 - k, 3))) + suf;
+      if (k < 1) requestAnimationFrame(tick);
+    };
+    tick();
+  })(els[i]);
+}
+
+function go(id) {
+  if (!SCREENS[id]) return;
+  var v = document.getElementById('view');
+  document.getElementById('scroll').scrollTop = 0;
+  paintNav(id);
+  var ix = document.getElementById('index'); if (ix) ix.remove();
+  var paint = function () {
+    v.innerHTML = '<div class="screen">' + SCREENS[id]() + '</div>';
+    autoCarousel();
+    countUp();
+  };
+  if (FETCHES.indexOf(id) >= 0) { v.innerHTML = skeleton(); setTimeout(paint, 520); }
+  else paint();
+}
+function pick(el) {
+  var p = el.parentNode.children;
+  for (var i = 0; i < p.length; i++) p[i].classList.remove('on');
+  el.classList.add('on');
+}
+function toast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'on';
+  clearTimeout(t._h);
+  t._h = setTimeout(function () { t.className = ''; }, 1900);
+}
+
+/* every primary action spins before it resolves, so a slow network never looks like a dead tap */
+function busy(el, ms, then) {
+  el.classList.add('busy');
+  setTimeout(function () { el.classList.remove('busy'); then(); }, ms || 700);
+}
+
+function submitReq() { go('sending'); setTimeout(function () { go('sent'); }, 1500); }
+
+/* Detecting the panchayat needs GP boundaries or at least GP centroids. The district's
+   master has lat/lng for only a handful of GPs today, so this falls back to the nearest
+   facility and asks the user to confirm - never silently guesses. */
+function detectLoc() {
+  var b = document.getElementById('locbtn'), o = document.getElementById('locout');
+  b.textContent = 'FINDING YOU…';
+  b.style.opacity = '.6';
+  o.innerHTML = '<div class="sk" style="width:70%;margin:0 auto"></div>';
+  setTimeout(function () {
+    b.style.display = 'none';
+    o.innerHTML =
+      '<div style="background:var(--green-50);border-radius:10px;padding:12px;text-align:left">' +
+        '<div class="row"><span style="font-size:17px">✅</span><div class="sp1">' +
+        '<b style="font-size:13.5px">Alimpur, Jangaon</b>' +
+        '<div class="en">Nearest centre AH-01 · 4.2 km</div></div></div>' +
+        '<div class="en" style="margin-top:7px">Matched to the nearest veterinary centre. ' +
+        'Confirm this is your panchayat.</div>' +
+        '<button class="btn" style="margin-top:10px" onclick="go(\'home\')">' +
+          'YES, THAT IS RIGHT</button></div>';
+  }, 1400);
+}
+
+var MAP = [
+  ['User', [['signin','Sign in','no OTP'],['loc','Set location','panchayat'],
+    ['home','Home','assigned care'],
+    ['centre','Your centre','why this one'],['cases','My cases','all requests'],
+    ['new1','Ask 1','animal'],['new2','Ask 2','problem'],['new3','Ask 3','location'],
+    ['sent','Submitted','token'],['track','Track','timeline'],['calling','WhatsApp','handoff'],
+    ['rx','Prescription','withdrawal'],['records','My animals','per ear tag'],
+    ['vacc','Vaccination','due dates'],['tips','Care','articles'],['emg','Emergency','1962']]],
+  ['Doctor', [['queue','Queue','open cases'],['case','Case','claim'],['prescribe','Prescribe','meds'],
+    ['attend','Attendance','geo'],['stock','Stock','centre']]],
+  ['District', [['dash','Dashboard','stats'],['broadcast','Broadcasts','publish']]]
+];
+document.getElementById('mapBtn').onclick = function () {
+  if (document.getElementById('index')) { document.getElementById('index').remove(); return; }
+  var d = document.createElement('div');
+  d.id = 'index';
+  d.innerHTML = '<div class="hd"><button class="bk" onclick="this.closest(\'#index\').remove()">✕</button>' +
+    '<div class="t" style="font-size:16px;font-weight:800">All screens</div></div><div class="body">' +
+    MAP.map(function (g) { return '<div class="grp">' + g[0] + '</div><div class="ix">' +
+      g[1].map(function (s) { return '<b onclick="go(\'' + s[0] + '\')">' + s[1] + '<i>' + s[2] +
+        '</i></b>'; }).join('') + '</div>'; }).join('') + '</div>';
+  document.querySelector('.device').appendChild(d);
+};
+
+document.getElementById('replay').onclick = function () {
+  var sp = document.getElementById('splash');
+  sp.className = '';
+  void sp.offsetWidth;                       // restart the animations
+  setTimeout(function () { sp.className = 'gone'; }, 2600);
+};
+go('signin');
+setTimeout(function () { document.getElementById('splash').className = 'gone'; }, 2600);
+</script>
+
+</body>
+</html>
