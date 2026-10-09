@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.6.0-M5 b008
+/* JPS app.js — BUILD JPS v0.6.0-M5 b009
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.6.0-M5 b008';
+var BUILD = 'JPS v0.6.0-M5 b009';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', pic:'🐄' }, { v:'buffalo', te:'గేదె', en:'Buffalo', pic:'🐃' },
@@ -1674,15 +1674,18 @@ function paintTabs() {
   var tab = function (href, icon, te, en, cls) {
     var on = (href === '#home' && (h === '#home' || h === ''))
       || (href !== '#home' && h.indexOf(href) === 0);
+    // one word per tab, never bilingual: five 'Telugu · English' labels
+    // do not fit a phone and collide with each other.
     return '<a href="' + href + '" class="' + (cls || '') + (on ? ' on' : '') + '">' +
-      '<span class="ic">' + icon + '</span><span>' + esc(T(te, en)) + '</span></a>';
+      '<span class="ic">' + icon + '</span><span class="tx">' +
+      esc(S.lang === 'en' ? en : te) + '</span></a>';
   };
   bar.innerHTML =
     tab('#home', '🏠', '\u0c39\u0c4b\u0c2e\u0c4d', 'Home') +
     tab('#cases', '📋', '\u0c15\u0c47\u0c38\u0c41\u0c32\u0c41', 'Cases') +
     tab('#new', '➕', '\u0c05\u0c21\u0c17\u0c02\u0c21\u0c3f', 'Ask') +
     tab('#animals', '🐄', '\u0c2a\u0c36\u0c41\u0c35\u0c41\u0c32\u0c41', 'Animals') +
-    '<a href="tel:1962" class="sos"><span class="ic">🚑</span><span>1962</span></a>';
+    '<a href="tel:1962" class="sos"><span class="ic">🚑</span><span class="tx">1962</span></a>';
 }
 
 function route() {

@@ -300,12 +300,14 @@ body.staff .stickycta{bottom:0}
 
 /* ---------------------------------------------------------------- bottom nav */
 nav.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:50;display:grid;
-  grid-template-columns:repeat(4,1fr);background:var(--card);border-top:1px solid var(--line);
+  grid-template-columns:repeat(5,1fr);background:var(--card);border-top:1px solid var(--line);
   padding-bottom:env(safe-area-inset-bottom,0px);box-shadow:0 -2px 14px rgba(2,71,91,.07)}
-nav.tabbar a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
-  min-height:var(--navh);padding:8px 4px 7px;font-size:10.5px;font-weight:700;color:var(--ink-3);
-  line-height:1.2;text-align:center}
-nav.tabbar a .ic{font-size:20px;line-height:1}
+nav.tabbar a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  min-width:0;overflow:hidden;
+  min-height:var(--navh);padding:7px 1px 6px;font-size:9.5px;font-weight:700;color:var(--ink-3);
+  line-height:1.15;text-align:center}
+nav.tabbar a .ic{font-size:19px;line-height:1}
+nav.tabbar a .tx{display:block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 nav.tabbar a.on{color:var(--cta)}
 nav.tabbar a.sos{color:var(--red)}
 nav.tabbar[hidden]{display:none}
