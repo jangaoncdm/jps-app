@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#1D6FE0">
 <meta name="robots" content="noindex">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Pashu Preview">
 <title>Pashu Seva Assigned Care</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Telugu:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap">
 <style>
@@ -40,31 +46,47 @@ img{display:block;max-width:100%}
 }
 
 /* splash */
-/* Welcome: four staged beats, then the whole panel lifts away to reveal the app.
-   Long enough to register, short enough that nobody waits for it. */
-#splash{position:absolute;inset:0;z-index:90;background:var(--cta);color:#fff;display:flex;
-  flex-direction:column;align-items:center;justify-content:center;gap:12px;overflow:hidden}
-#splash:before{content:"";position:absolute;width:520px;height:520px;border-radius:50%;
-  background:rgba(255,255,255,.07);animation:ring 2.6s cubic-bezier(.2,.8,.3,1) both}
-#splash:after{content:"";position:absolute;width:340px;height:340px;border-radius:50%;
-  background:rgba(255,255,255,.07);animation:ring 2.6s .12s cubic-bezier(.2,.8,.3,1) both}
-@keyframes ring{0%{transform:scale(0);opacity:0}45%{opacity:1}100%{transform:scale(1);opacity:1}}
-#splash.gone{animation:so .62s cubic-bezier(.65,0,.35,1) forwards}
-@keyframes so{to{transform:translateY(-102%);visibility:hidden}}
-.sM{position:relative;z-index:2;width:92px;height:92px;border-radius:29px;background:#fff;
-  color:var(--cta);display:flex;align-items:center;justify-content:center;font-size:46px;
-  animation:si 1s cubic-bezier(.16,1.5,.4,1) both}
-@keyframes si{0%{transform:scale(.2) rotate(-14deg);opacity:0}
-  55%{transform:scale(1.07) rotate(3deg);opacity:1}100%{transform:none;opacity:1}}
-.sN{position:relative;z-index:2;font-size:21px;font-weight:800;letter-spacing:-.01em;
-  animation:su .6s .42s cubic-bezier(.2,.9,.3,1) both}
-.sS{position:relative;z-index:2;font-size:12px;opacity:.88;margin-top:-7px;
-  animation:su .6s .56s cubic-bezier(.2,.9,.3,1) both}
+/* Welcome: a soft colour field with frosted glass over it. Blobs drift, the glass panel
+   rises into place, then the whole thing lifts away. */
+#splash{position:absolute;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;
+  overflow:hidden;background:#0B1B3A;color:#fff;isolation:isolate}
+#splash .blob{position:absolute;border-radius:50%;filter:blur(46px);opacity:.85}
+#splash .b1{width:300px;height:300px;background:#2E6BFF;top:-60px;left:-70px;animation:dr1 7s ease-in-out infinite alternate}
+#splash .b2{width:260px;height:260px;background:#13C3B6;bottom:-50px;right:-60px;animation:dr2 8s ease-in-out infinite alternate}
+#splash .b3{width:240px;height:240px;background:#8B5CF6;top:36%;right:-70px;animation:dr3 9s ease-in-out infinite alternate}
+#splash .b4{width:210px;height:210px;background:#F0709B;bottom:16%;left:-60px;animation:dr2 10s ease-in-out infinite alternate}
+@keyframes dr1{to{transform:translate(50px,60px) scale(1.18)}}
+@keyframes dr2{to{transform:translate(-44px,-54px) scale(1.14)}}
+@keyframes dr3{to{transform:translate(-56px,40px) scale(1.2)}}
+#splash .grain{position:absolute;inset:0;backdrop-filter:blur(34px) saturate(140%);
+  background:rgba(11,27,58,.22)}
+#splash.gone{animation:so .66s cubic-bezier(.65,0,.35,1) forwards}
+@keyframes so{to{opacity:0;transform:scale(1.07);visibility:hidden}}
+
+.glass{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:11px;
+  padding:34px 30px 30px;border-radius:30px;
+  background:linear-gradient(145deg,rgba(255,255,255,.19),rgba(255,255,255,.07));
+  backdrop-filter:blur(22px) saturate(160%);
+  border:1px solid rgba(255,255,255,.3);
+  box-shadow:0 20px 54px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.45);
+  animation:gIn .95s cubic-bezier(.18,1.2,.35,1) both}
+@keyframes gIn{0%{opacity:0;transform:translateY(34px) scale(.9)}100%{opacity:1;transform:none}}
+.sM{width:92px;height:92px;border-radius:29px;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(150deg,rgba(255,255,255,.95),rgba(255,255,255,.72));
+  box-shadow:0 10px 30px rgba(0,0,0,.22),inset 0 1px 0 #fff;
+  animation:si 1s .14s cubic-bezier(.16,1.5,.4,1) both;overflow:hidden}
+.sM img{width:76px;height:76px;display:block}
+@keyframes si{0%{transform:scale(.3) rotate(-12deg);opacity:0}
+  58%{transform:scale(1.06) rotate(3deg);opacity:1}100%{transform:none;opacity:1}}
+.sN{font-size:21px;font-weight:800;letter-spacing:-.01em;text-shadow:0 1px 14px rgba(0,0,0,.25);
+  animation:su .6s .46s cubic-bezier(.2,.9,.3,1) both}
+.sS{font-size:12px;opacity:.9;margin-top:-6px;animation:su .6s .58s cubic-bezier(.2,.9,.3,1) both}
 @keyframes su{from{transform:translateY(16px);opacity:0}to{transform:none;opacity:1}}
-.sB{position:relative;z-index:2;width:132px;height:4px;border-radius:9px;
-  background:rgba(255,255,255,.26);overflow:hidden;margin-top:10px;animation:su .5s .7s both}
-.sB i{display:block;height:100%;border-radius:9px;background:#fff;
-  animation:sl 1.5s .78s cubic-bezier(.45,.05,.3,1) forwards}
+.sB{width:136px;height:4px;border-radius:9px;background:rgba(255,255,255,.24);overflow:hidden;
+  margin-top:9px;animation:su .5s .7s both}
+.sB i{display:block;height:100%;border-radius:9px;
+  background:linear-gradient(90deg,#fff,rgba(255,255,255,.75));
+  animation:sl 1.6s .78s cubic-bezier(.45,.05,.3,1) forwards}
 @keyframes sl{0%{width:0}55%{width:62%}100%{width:100%}}
 #replay{position:absolute;right:13px;bottom:calc(126px + env(safe-area-inset-bottom,0px));z-index:45;
   width:42px;height:42px;border-radius:50%;background:#fff;color:var(--ink);font-size:16px;
@@ -317,10 +339,15 @@ input:focus,select:focus,textarea:focus{outline:0;border-color:var(--cta);
 <div class="stage">
   <div class="device">
     <div id="splash">
-      <div class="sM">🐄</div>
-      <div class="sN">Jangaon Pashu Seva</div>
-      <div class="sS">Govt. Veterinary Care · Jangaon</div>
-      <div class="sB"><i></i></div>
+      <div class="blob b1"></div><div class="blob b2"></div>
+      <div class="blob b3"></div><div class="blob b4"></div>
+      <div class="grain"></div>
+      <div class="glass">
+        <div class="sM"><img src="icon-192.png" alt=""></div>
+        <div class="sN">Jangaon Pashu Seva</div>
+        <div class="sS">Government veterinary care</div>
+        <div class="sB"><i></i></div>
+      </div>
     </div>
     <div class="scroll" id="scroll"><div id="view"></div></div>
     <div id="nav"></div>
@@ -520,38 +547,24 @@ vacc: function () { return ''+
 loc: function () { return ''+
   '<div class="ihd"><div class="t">Where is your animal?</div></div>' +
   '<div class="pad" style="padding-top:14px">' +
-    '<div class="card" style="text-align:center;padding:20px 15px">' +
-      '<div style="width:64px;height:64px;border-radius:50%;background:var(--cta-50);color:var(--cta);' +
-        'display:flex;align-items:center;justify-content:center;font-size:30px;margin:0 auto;' +
-        'animation:pulseLoc 1.8s ease-in-out infinite">📍</div>' +
-      '<style>@keyframes pulseLoc{0%,100%{box-shadow:0 0 0 0 rgba(29,111,224,.25)}' +
-        '50%{box-shadow:0 0 0 16px rgba(29,111,224,0)}}</style>' +
-      '<div style="font-size:15px;font-weight:800;margin-top:12px">Use my current location</div>' +
-      '<div class="sub" style="margin-top:3px">We find your Gram Panchayat and the centre it is ' +
-        'mapped to.</div>' +
-      '<button class="btn" style="margin-top:13px" onclick="detectLoc()" id="locbtn">' +
-        'ALLOW LOCATION</button>' +
-      '<div id="locout" style="margin-top:11px"></div></div>' +
+    '<p class="sub">Your Gram Panchayat decides which centre and which on-duty vet gets your ' +
+      'case. Pick whichever way is easier.</p>' +
 
-    '<div class="row" style="margin:14px 0"><div style="flex:1;height:1px;background:var(--line)">' +
-      '</div><span class="en">or choose it yourself</span>' +
-      '<div style="flex:1;height:1px;background:var(--line)"></div></div>' +
+    '<div class="split" style="margin-top:13px">' +
+      '<b id="optAuto" onclick="locMode(\'auto\')" style="text-align:center;padding:16px 11px">' +
+        '<span class="e">📍</span><div class="t">Use my location</div>' +
+        '<div class="s">Fastest</div></b>' +
+      '<b id="optMan" onclick="locMode(\'man\')" style="text-align:center;padding:16px 11px">' +
+        '<span class="e">✍️</span><div class="t">Enter it myself</div>' +
+        '<div class="s">Choose from a list</div></b></div>' +
 
-    '<div class="card"><label style="margin-top:0">Mandal</label>' +
-      '<select><option>Jangaon</option><option>Palakurthy</option><option>Devaruppula</option>' +
-        '<option>Zaffergadh</option></select>' +
-      '<label>Gram Panchayat</label>' +
-      '<select><option>Alimpur</option><option>Kodavatur</option><option>Chennaram</option></select>' +
-      '<label>Village / habitation</label><input value="Alimpur" placeholder="Village">' +
-      '<div style="height:13px"></div>' +
-      '<button class="btn" onclick="busy(this,700,function(){toast(\'Location saved\');go(\'home\')})">SAVE &amp; CONTINUE</button></div>' +
+    '<div id="locPane"></div>' +
 
     '<div class="card" style="background:var(--cta-50);box-shadow:none">' +
       '<div class="row" style="align-items:flex-start"><span style="font-size:17px">ℹ️</span>' +
       '<div class="sub"><b>Asked once, then remembered.</b><br>' +
-      '<span class="en">It is saved to your profile and reused on every request. You can change it ' +
-      'from the pin on the home screen. The panchayat decides which centre and which on-duty vet ' +
-      'gets your case.</span></div></div></div>' +
+      '<span class="en">Saved to your profile and reused on every request. Change it any time from ' +
+      'the pin on the home screen.</span></div></div></div>' +
     '<div style="height:16px"></div></div>'; },
 
 new1: function () { return ''+
@@ -924,7 +937,7 @@ function go(id) {
     countUp();
   };
   if (FETCHES.indexOf(id) >= 0) { v.innerHTML = skeleton(); setTimeout(paint, 520); }
-  else paint();
+  else { paint(); if (id === 'loc') locMode('auto'); }
 }
 function pick(el) {
   var p = el.parentNode.children;
@@ -949,6 +962,43 @@ function submitReq() { go('sending'); setTimeout(function () { go('sent'); }, 15
 /* Detecting the panchayat needs GP boundaries or at least GP centroids. The district's
    master has lat/lng for only a handful of GPs today, so this falls back to the nearest
    facility and asks the user to confirm - never silently guesses. */
+function locMode(m) {
+  var a = document.getElementById('optAuto'), n = document.getElementById('optMan');
+  var on = 'box-shadow:inset 0 0 0 2.4px var(--cta);background:var(--cta-50)';
+  a.setAttribute('style', 'text-align:center;padding:16px 11px;' + (m === 'auto' ? on : ''));
+  n.setAttribute('style', 'text-align:center;padding:16px 11px;' + (m === 'man' ? on : ''));
+  var pane = document.getElementById('locPane');
+  if (m === 'auto') {
+    pane.innerHTML =
+      '<div class="card" style="text-align:center;padding:20px 15px">' +
+        '<div style="width:62px;height:62px;border-radius:50%;background:var(--cta-50);' +
+          'color:var(--cta);display:flex;align-items:center;justify-content:center;font-size:29px;' +
+          'margin:0 auto;animation:pulseLoc 1.8s ease-in-out infinite">📍</div>' +
+        '<style>@keyframes pulseLoc{0%,100%{box-shadow:0 0 0 0 rgba(29,111,224,.25)}' +
+          '50%{box-shadow:0 0 0 16px rgba(29,111,224,0)}}</style>' +
+        '<div class="sub" style="margin-top:11px">We match you to the nearest centre and ask you ' +
+          'to confirm the panchayat.</div>' +
+        '<button class="btn" style="margin-top:12px" onclick="detectLoc()" id="locbtn">' +
+          'ALLOW LOCATION</button>' +
+        '<div id="locout" style="margin-top:11px"></div></div>';
+  } else {
+    pane.innerHTML =
+      '<div class="card"><label style="margin-top:0">Mandal</label>' +
+        '<select><option>Jangaon</option><option>Palakurthy</option><option>Devaruppula</option>' +
+          '<option>Zaffergadh</option><option>Narmetta</option><option>Chilpur</option>' +
+          '<option>Bachannapeta</option><option>Ghanpur (Station)</option><option>Kodakandla</option>' +
+          '<option>Lingalaghanpur</option><option>Raghunathpally</option>' +
+          '<option>Tharigoppula</option></select>' +
+        '<label>Gram Panchayat</label>' +
+        '<select><option>Alimpur</option><option>Kodavatur</option><option>Chennaram</option>' +
+          '<option>Pembarthy</option></select>' +
+        '<label>Village / habitation</label><input value="Alimpur" placeholder="Village">' +
+        '<div style="height:13px"></div>' +
+        '<button class="btn" onclick="busy(this,700,function(){toast(\'Location saved\');' +
+          'go(\'home\')})">SAVE &amp; CONTINUE</button></div>';
+  }
+}
+
 function detectLoc() {
   var b = document.getElementById('locbtn'), o = document.getElementById('locout');
   b.textContent = 'FINDING YOU…';
