@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>జనగామ పశు సేవ — Jangaon Pashu Seva</title>
-<meta name="theme-color" content="#1D6FE0">
+<meta name="theme-color" content="#36618E">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -14,76 +14,86 @@
 <meta name="apple-mobile-web-app-title" content="పశు సేవ">
 <style>
 /* ============================================================================
-   JPS design system v3 — the Apollo-shaped UI, on the real client.
-   Light header instead of a coloured bar, action blue for everything you can press,
-   motion wherever the app loads or waits, and a glass welcome over a colour field.
-   Same single file, no framework, no build step.
+   JPS design system v4 — Material Expressive, light only.
+   Tonal surfaces instead of white-on-white, one shape scale, a weight scale that
+   is not all-bold, and one drawn icon family instead of 62 device emoji.
+   Light only on purpose: a vet and a farmer looking at the same ticket see the
+   same colours. Same single file, no framework, no build step.
    ========================================================================== */
 :root{
-  --ink:#02475B; --ink-2:#67909E; --ink-3:#9BB5BF; --navy:#01364A;
-  --cta:#1D6FE0; --cta-d:#1557B8; --cta-50:#E8F0FD; --cta-100:#CFE0FA;
-  --green:#00B38E; --green-50:#E5F7F3;
-  --app:#F7F8F5; --card:#FFFFFF; --line:#E8EDF0; --line-2:#D4DEE3;
-  --red:#D0342C; --red-50:#FCEDEC; --amber:#A96D00; --amber-50:#FFF6E6;
-  --wa:#25D366; --brand:var(--cta); --brand-ink:var(--ink);
-  --r:13px; --r-lg:16px; --tap:48px; --navh:62px;
+  /* on-surface / variant / outline — three steps, not three greys */
+  --ink:#191C20; --ink-2:#43474E; --ink-3:#73777F; --navy:#001D33;
+  /* primary and its container. The container is a real tone, not an 8% wash:
+     at 8% saturation a tint reads as dirty white and carries no meaning. */
+  --cta:#36618E; --cta-d:#194975; --cta-50:#D7E3F8; --cta-100:#C0D3EC;
+  --green:#1E7A52; --green-50:#BCF0D0;
+  /* the ground is tonal and cards are white, so a card is visibly a card */
+  --app:#EEF0F7; --card:#FFFFFF; --line:#E1E3EB; --line-2:#C3C6CF;
+  --red:#BA1A1A; --red-50:#FFDAD6; --amber:#7A5900; --amber-50:#FFDEA6;
+  --violet-50:#EADDF6; --pink-50:#F6D9E8;
+  --wa:#128C7E; --brand:var(--cta); --brand-ink:var(--ink);
+  /* M3 shape scale: data card / card / hero */
+  --r:12px; --r-lg:20px; --tap:48px; --navh:62px;
   color-scheme:light;
 }
 *{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%}
 body{font-family:"Noto Sans Telugu","Noto Sans",system-ui,-apple-system,sans-serif;
   background:var(--app); color:var(--ink); font-size:16px; line-height:1.55;
-  -webkit-text-size-adjust:100%; overflow-x:hidden}
+  -webkit-text-size-adjust:100%; overflow-x:hidden;
+  /* A faux-bold 800 of a face that has no 800 is what made every screen look
+     the same weight. Ask for nothing the font cannot actually draw. */
+  font-synthesis:none; -webkit-font-synthesis:none}
 img{max-width:100%}
+/* One drawn family, sized by the container's font-size and coloured by its text
+   colour, so every rule that used to size an emoji still sizes the icon. */
+.i{width:1em;height:1em;flex:none;fill:none;stroke:currentColor;stroke-width:1.9;
+  stroke-linecap:round;stroke-linejoin:round;vertical-align:-.13em}
+nav.tabbar a .ic .i,.specs i .i,.tiprow .ti .i,.lrow .pin .i,.known .ic .i{stroke-width:2.2}
+.locpulse .i,.tile .pic .i,.addcta > span .i{stroke-width:1.7}
+/* status dots that used to be a coloured-circle emoji */
+.dot{display:inline-block;width:.62em;height:.62em;border-radius:50%;background:currentColor;
+  vertical-align:.02em;margin-right:.1em}
+.dot.red{color:var(--red)}.dot.green{color:var(--green)}.dot.amber{color:var(--amber)}
 a{color:var(--cta); text-decoration:none}
 :focus-visible{outline:2.5px solid var(--cta); outline-offset:2px; border-radius:6px}
 
 /* ---------------------------------------------------------------- welcome */
-#splash{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;
-  overflow:hidden;background:#0B1B3A;color:#fff}
-#splash .blob{position:absolute;border-radius:50%;filter:blur(46px);opacity:.85}
-#splash .b1{width:300px;height:300px;background:#2E6BFF;top:-60px;left:-70px;animation:dr1 7s ease-in-out infinite alternate}
-#splash .b2{width:260px;height:260px;background:#13C3B6;bottom:-50px;right:-60px;animation:dr2 8s ease-in-out infinite alternate}
-#splash .b3{width:240px;height:240px;background:#8B5CF6;top:36%;right:-70px;animation:dr3 9s ease-in-out infinite alternate}
-#splash .b4{width:210px;height:210px;background:#F0709B;bottom:16%;left:-60px;animation:dr2 10s ease-in-out infinite alternate}
-@keyframes dr1{to{transform:translate(50px,60px) scale(1.18)}}
-@keyframes dr2{to{transform:translate(-44px,-54px) scale(1.14)}}
-@keyframes dr3{to{transform:translate(-56px,40px) scale(1.2)}}
-#splash .grain{position:absolute;inset:0;backdrop-filter:blur(34px) saturate(140%);
-  background:rgba(11,27,58,.22)}
-#splash.gone{animation:spOut .62s cubic-bezier(.65,0,.35,1) forwards}
-@keyframes spOut{to{opacity:0;transform:scale(1.07);visibility:hidden}}
-.glass{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:11px;
-  padding:32px 30px 28px;border-radius:30px;
-  background:linear-gradient(145deg,rgba(255,255,255,.19),rgba(255,255,255,.07));
-  backdrop-filter:blur(22px) saturate(160%);border:1px solid rgba(255,255,255,.3);
-  box-shadow:0 20px 54px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.45);
-  animation:gIn .95s cubic-bezier(.18,1.2,.35,1) both}
-@keyframes gIn{0%{opacity:0;transform:translateY(34px) scale(.9)}100%{opacity:1;transform:none}}
-.glass .mk{width:88px;height:88px;border-radius:27px;display:flex;align-items:center;
-  justify-content:center;overflow:hidden;
-  background:linear-gradient(150deg,rgba(255,255,255,.95),rgba(255,255,255,.72));
-  box-shadow:0 10px 30px rgba(0,0,0,.22),inset 0 1px 0 #fff;
-  animation:mkIn 1s .12s cubic-bezier(.16,1.5,.4,1) both}
-.glass .mk img{width:74px;height:74px;display:block}
-@keyframes mkIn{0%{transform:scale(.3) rotate(-12deg);opacity:0}
-  58%{transform:scale(1.06) rotate(3deg);opacity:1}100%{transform:none;opacity:1}}
-.glass .nm{font-size:20px;font-weight:800;letter-spacing:-.01em;text-shadow:0 1px 14px rgba(0,0,0,.25);
-  animation:gUp .6s .44s cubic-bezier(.2,.9,.3,1) both}
-.glass .sb{font-size:12px;opacity:.9;margin-top:-6px;animation:gUp .6s .56s cubic-bezier(.2,.9,.3,1) both}
-@keyframes gUp{from{transform:translateY(16px);opacity:0}to{transform:none;opacity:1}}
-.glass .pb{width:132px;height:4px;border-radius:9px;background:rgba(255,255,255,.24);
-  overflow:hidden;margin-top:8px;animation:gUp .5s .68s both}
-.glass .pb i{display:block;height:100%;border-radius:9px;
-  background:linear-gradient(90deg,#fff,rgba(255,255,255,.75));
-  animation:pbFill 1.5s .76s cubic-bezier(.45,.05,.3,1) forwards}
+/* The first screen is the one that says whose app this is: the state emblem and
+   the department roundel, side by side on a hairline, neither cropping the other. */
+#splash{position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:0;overflow:hidden;
+  background:var(--app);color:var(--ink);
+  padding:calc(34px + env(safe-area-inset-top,0px)) 26px calc(26px + env(safe-area-inset-bottom,0px))}
+#splash.gone{animation:spOut .55s cubic-bezier(.65,0,.35,1) forwards}
+@keyframes spOut{to{opacity:0;transform:scale(1.03);visibility:hidden}}
+.crest{display:flex;flex-direction:column;align-items:center;text-align:center;
+  animation:gUp .6s .06s cubic-bezier(.2,.9,.3,1) both}
+.crest-row{display:flex;align-items:center;justify-content:center;gap:20px}
+.crest-row img{display:block;width:74px;height:74px;flex:none}
+.crest-rule{width:1px;height:48px;background:var(--line-2);flex:none}
+.crest-cap{font-size:12.5px;line-height:1.45;color:var(--ink-2);margin-top:13px}
+.crest-cap span{display:block;font-size:10.5px;color:var(--ink-3);margin-top:2px}
+.sp-hero{text-align:center;background:var(--cta-50);border-radius:28px;
+  padding:22px 24px;margin-top:26px;max-width:330px;
+  animation:gIn .7s .14s cubic-bezier(.2,1.1,.35,1) both}
+.sp-hero .nm{font-size:27px;font-weight:600;letter-spacing:-.01em;line-height:1.2;color:var(--navy)}
+.sp-hero .sb{font-size:13.5px;line-height:1.55;color:var(--cta-d);margin-top:8px}
+@keyframes gIn{from{opacity:0;transform:translateY(18px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes gUp{from{transform:translateY(14px);opacity:0}to{transform:none;opacity:1}}
+.pb{width:132px;height:4px;border-radius:9px;background:var(--line-2);
+  overflow:hidden;margin-top:26px;animation:gUp .5s .4s both}
+.pb i{display:block;height:100%;border-radius:9px;background:var(--cta);
+  animation:pbFill 1.6s .5s cubic-bezier(.45,.05,.3,1) forwards}
 @keyframes pbFill{0%{width:0}55%{width:62%}100%{width:100%}}
+.sp-foot{position:absolute;left:0;right:0;text-align:center;font-size:11px;color:var(--ink-3);
+  bottom:calc(20px + env(safe-area-inset-bottom,0px))}
 
 /* ---------------------------------------------------------------- header */
 header.top{display:flex;align-items:center;gap:10px;background:var(--card);
   padding:calc(11px + env(safe-area-inset-top,0px)) 15px 11px;
   border-bottom:1px solid var(--line);position:sticky;top:0;z-index:40}
-header.top .t{font-size:15.5px;font-weight:800;letter-spacing:-.01em;line-height:1.2;color:var(--ink)}
+header.top .t{font-size:15.5px;font-weight:600;letter-spacing:-.01em;line-height:1.2;color:var(--ink)}
 header.top .s{font-size:10.5px;color:var(--ink-3);line-height:1.3;margin-top:1px}
 header.top .sp{flex:1}
 header.top button{min-height:34px;padding:7px 12px;border:0;border-radius:8px;
@@ -95,26 +105,26 @@ header.top button:active{background:var(--cta-50)}
 .wrap{max-width:560px;margin:0 auto;padding:15px;
   padding-bottom:calc(var(--navh) + 26px + env(safe-area-inset-bottom,0px))}
 body.staff .wrap{padding-bottom:26px}
-h1{font-size:21px;line-height:1.25;font-weight:800;letter-spacing:-.02em;text-wrap:balance}
-h2{font-size:15px;font-weight:800;margin-bottom:9px;letter-spacing:-.01em}
+h1{font-size:21px;line-height:1.25;font-weight:600;letter-spacing:-.02em;text-wrap:balance}
+h2{font-size:15px;font-weight:600;margin-bottom:9px;letter-spacing:-.01em}
 p + p{margin-top:8px}
 .hint{font-size:13px;color:var(--ink-2);line-height:1.5}
 .en{font-size:11.5px;color:var(--ink-3);font-weight:500}
 .when{font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums}
 
 .card{background:var(--card);border-radius:var(--r-lg);padding:14px;margin-bottom:12px;
-  box-shadow:0 1px 3px rgba(2,71,91,.07)}
+  box-shadow:0 1px 3px rgba(25,28,32,.07)}
 .card > h2:first-child{margin-top:0}
 
 /* ---------------------------------------------------------------- buttons */
 .btn{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;
   gap:8px;width:100%;min-height:var(--tap);padding:12px 17px;font-family:inherit;font-size:15px;
-  font-weight:800;line-height:1.25;text-align:center;color:#fff;background:var(--cta);
-  border:0;border-radius:10px;cursor:pointer;transition:transform .09s ease,background .12s}
+  font-weight:600;line-height:1.25;text-align:center;color:#fff;background:var(--cta);
+  border:0;border-radius:24px;cursor:pointer;transition:transform .09s ease,background .12s}
 .btn:active{transform:scale(.976);background:var(--cta-d)}
-.btn.small{display:inline-flex;width:auto;min-height:40px;padding:9px 15px;font-size:13.5px;
-  border-radius:8px}
-.btn.ghost{background:var(--card);color:var(--cta);box-shadow:inset 0 0 0 1.6px var(--cta-100)}
+.btn.small{display:inline-flex;width:auto;min-height:40px;padding:9px 16px;font-size:13.5px;
+  border-radius:20px}
+.btn.ghost{background:transparent;color:var(--cta);box-shadow:inset 0 0 0 1.4px var(--line-2)}
 .btn.ghost:active{background:var(--cta-50)}
 .btn.green{background:var(--green)}
 .btn.amber{background:var(--amber)}
@@ -132,7 +142,7 @@ p + p{margin-top:8px}
 .rowline2{display:grid;grid-template-columns:1fr 1fr;gap:11px}
 
 /* ---------------------------------------------------------------- forms */
-label{display:block;font-size:12.5px;font-weight:800;color:var(--ink-2);margin:13px 0 6px}
+label{display:block;font-size:12.5px;font-weight:700;color:var(--ink-2);margin:13px 0 6px}
 label:first-child{margin-top:0}
 input,select,textarea{width:100%;min-height:var(--tap);padding:12px 13px;font-family:inherit;
   font-size:15px;color:var(--ink);background:var(--card);border:1.5px solid var(--line-2);
@@ -178,7 +188,7 @@ input[type="file"]{padding:10px;font-size:14px}
 
 /* ---------------------------------------------------------------- status */
 .badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:6px;
-  font-size:11.5px;font-weight:800;white-space:nowrap;background:var(--app);color:var(--ink-2)}
+  font-size:11.5px;font-weight:700;white-space:nowrap;background:var(--app);color:var(--ink-2)}
 .b-NEW{background:var(--amber-50);color:var(--amber)}
 .b-ASSIGNED{background:var(--cta-50);color:var(--cta)}
 .b-RESOLVED{background:var(--green-50);color:var(--green)}
@@ -187,13 +197,13 @@ input[type="file"]{padding:10px;font-size:14px}
 .chip{min-height:38px;display:inline-flex;align-items:center;padding:8px 14px;border-radius:8px;
   background:var(--card);box-shadow:inset 0 0 0 1.5px var(--line-2);font-size:13.5px;
   font-weight:700;color:var(--ink-2);cursor:pointer;transition:transform .11s}
-.chip.on{background:var(--ink);box-shadow:none;color:#fff}
+.chip.on{background:var(--cta-50);box-shadow:none;color:var(--cta-d)}
 
 .token{background:linear-gradient(140deg,var(--cta),var(--cta-d));color:#fff;
   border-radius:var(--r-lg);padding:17px 15px;text-align:center;margin-bottom:12px;
   box-shadow:0 6px 20px rgba(29,111,224,.25)}
 .token .lbl{font-size:11.5px;opacity:.85}
-.token .no{font-size:25px;font-weight:800;font-variant-numeric:tabular-nums;margin:2px 0}
+.token .no{font-size:25px;font-weight:600;font-variant-numeric:tabular-nums;margin:2px 0}
 
 /* ---------------------------------------------------------------- timeline */
 .rail{list-style:none;padding:0;margin:0}
@@ -203,7 +213,7 @@ input[type="file"]{padding:10px;font-size:14px}
 .rail li:after{content:"";position:absolute;left:6px;top:16px;bottom:0;width:1.5px;background:var(--line)}
 .rail li:last-child{padding-bottom:0}
 .rail li:last-child:after{display:none}
-.rail b{font-size:14px;font-weight:800;display:block}
+.rail b{font-size:14px;font-weight:700;display:block}
 .rail div{font-size:13.5px;color:var(--ink-2)}
 
 /* ---------------------------------------------------------------- notices */
@@ -217,20 +227,20 @@ input[type="file"]{padding:10px;font-size:14px}
 /* ---------------------------------------------------------------- data */
 table{width:100%;border-collapse:collapse;font-size:13.5px}
 th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-3);
-  font-weight:800;padding:0 7px 7px 0;border-bottom:1.5px solid var(--line)}
+  font-weight:700;padding:0 7px 7px 0;border-bottom:1.5px solid var(--line)}
 td{padding:11px 7px 11px 0;border-bottom:1px solid var(--line);vertical-align:top}
 tr:last-child td{border-bottom:0}
 tr.breach td{background:var(--red-50)}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:9px}
 .stat{background:var(--app);border-radius:var(--r);padding:12px 11px}
-.stat .n{font-size:21px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--cta);line-height:1.15}
+.stat .n{font-size:21px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--cta);line-height:1.15}
 .stat .l{font-size:11.5px;color:var(--ink-3);margin-top:2px}
 .tabs{display:flex;gap:7px;margin-bottom:12px;overflow-x:auto;scrollbar-width:none}
 .tabs::-webkit-scrollbar{display:none}
 .tabs button{flex:none;min-height:38px;padding:8px 14px;border-radius:8px;border:0;
   background:var(--card);box-shadow:inset 0 0 0 1.5px var(--line);font-family:inherit;
   font-size:13.5px;font-weight:700;color:var(--ink-2);cursor:pointer}
-.tabs button.on{background:var(--ink);color:#fff;box-shadow:none}
+.tabs button.on{background:var(--cta-50);color:var(--cta-d);box-shadow:none}
 .ph{width:100%;border-radius:var(--r);margin-top:9px}
 .fac{font-size:14px}
 .bar{height:7px;border-radius:9px;background:var(--cta);min-width:3px}
@@ -256,19 +266,19 @@ tr.breach td{background:var(--red-50)}
 .staffnav button{flex:none;min-height:38px;padding:7px 13px;border-radius:8px;border:0;
   background:var(--card);box-shadow:inset 0 0 0 1.5px var(--line);font-family:inherit;
   font-size:13px;font-weight:700;color:var(--ink-2);cursor:pointer}
-.staffnav button.on{background:var(--ink);color:#fff;box-shadow:none}
+.staffnav button.on{background:var(--cta-50);color:var(--cta-d);box-shadow:none}
 
 /* ---------------------------------------------------------------- home */
 .hero{background:var(--card);border-radius:var(--r-lg);padding:16px;margin-bottom:12px;
-  box-shadow:0 1px 3px rgba(2,71,91,.07)}
+  box-shadow:0 1px 3px rgba(25,28,32,.07)}
 .hero-hi{font-size:12.5px;color:var(--ink-3);font-weight:700;margin-bottom:3px}
 .hero h1{margin-bottom:5px}
 .livecase{display:block;background:var(--card);border-left:3px solid var(--green);
   border-radius:var(--r-lg);padding:14px;margin-bottom:12px;color:var(--ink);
-  box-shadow:0 1px 3px rgba(2,71,91,.07)}
+  box-shadow:0 1px 3px rgba(25,28,32,.07)}
 .livecase .lc-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .livecase .lc-tk{font-size:11.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
-.livecase .lc-ttl{font-size:16px;font-weight:800;margin-top:6px}
+.livecase .lc-ttl{font-size:16px;font-weight:700;margin-top:6px}
 .livecase .lc-sub{font-size:13px;color:var(--ink-2);margin-top:2px}
 .sosbar{display:flex;gap:12px;align-items:center;background:var(--red-50);border-radius:var(--r-lg);
   padding:12px 14px;margin-bottom:12px;color:var(--ink)}
@@ -278,12 +288,12 @@ tr.breach td{background:var(--red-50)}
 .svc{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:12px}
 .svc a{background:var(--card);border-radius:12px;padding:11px 4px 9px;text-align:center;display:block;
   font-size:10.5px;font-weight:700;line-height:1.25;color:var(--ink);
-  box-shadow:0 1px 3px rgba(2,71,91,.06)}
+  box-shadow:0 1px 3px rgba(25,28,32,.06)}
 .svc i{display:flex;width:42px;height:42px;margin:0 auto 5px;border-radius:50%;font-style:normal;
   align-items:center;justify-content:center;font-size:21px;background:var(--cta-50)}
 .svc a:nth-child(2) i{background:var(--green-50)}
-.svc a:nth-child(3) i{background:#FBEAF2}
-.svc a:nth-child(4) i{background:#F0EDFB}
+.svc a:nth-child(3) i{background:var(--pink-50)}
+.svc a:nth-child(4) i{background:var(--violet-50)}
 .sh{display:flex;align-items:baseline;margin:18px 0 10px}
 .sh h2{flex:1;margin:0}
 .sh a{font-size:12.5px;font-weight:700}
@@ -313,12 +323,14 @@ body.staff .stickycta{bottom:0}
 /* ---------------------------------------------------------------- bottom nav */
 nav.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:50;display:grid;
   grid-template-columns:repeat(5,1fr);background:var(--card);border-top:1px solid var(--line);
-  padding-bottom:env(safe-area-inset-bottom,0px);box-shadow:0 -2px 14px rgba(2,71,91,.07)}
+  padding-bottom:env(safe-area-inset-bottom,0px);box-shadow:0 -2px 14px rgba(25,28,32,.07)}
 nav.tabbar a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
   min-width:0;overflow:hidden;
   min-height:var(--navh);padding:7px 1px 6px;font-size:9.5px;font-weight:700;color:var(--ink-3);
   line-height:1.15;text-align:center}
-nav.tabbar a .ic{font-size:19px;line-height:1}
+nav.tabbar a .ic{display:flex;align-items:center;justify-content:center;
+  width:56px;height:30px;border-radius:15px;font-size:19px;line-height:1;transition:background .16s}
+nav.tabbar a.on .ic{background:var(--cta-50)}
 nav.tabbar a .tx{display:block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 nav.tabbar a.on{color:var(--cta)}
 nav.tabbar a.sos{color:var(--red)}
@@ -328,8 +340,8 @@ nav.tabbar[hidden]{display:none}
 .rxcard{padding-top:15px}
 .rxhead{border-bottom:2px solid var(--ink);padding-bottom:9px;margin-bottom:12px}
 .rxdept{font-size:11.5px;color:var(--ink-3)}
-.rxfac{font-weight:800;font-size:16px;margin-top:2px;color:var(--ink)}
-.rxdoc{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;margin-top:3px;font-weight:800}
+.rxfac{font-weight:700;font-size:16px;margin-top:2px;color:var(--ink)}
+.rxdoc{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;margin-top:3px;font-weight:700}
 .rxreg{font-weight:600;font-size:12px;color:var(--ink-3)}
 .rxpt{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:5px 13px;
   background:var(--app);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:14px}
@@ -337,25 +349,25 @@ nav.tabbar[hidden]{display:none}
 .rxpt b{font-weight:600;color:var(--ink-3);font-size:12.5px}
 .rxsec{margin-bottom:13px}
 .rxsec h3{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-3);
-  margin:0 0 5px;font-weight:800}
+  margin:0 0 5px;font-weight:700}
 .rxpre{white-space:pre-line;border-left:3px solid var(--line);padding-left:10px;margin:0}
 .rxtab{width:100%;border-collapse:collapse;font-size:14px}
 .rxtab th{padding:0 7px 6px 0}
 .rxtab td{padding:9px 7px 9px 0;vertical-align:top}
-.rxtab .rxn{width:18px;color:var(--ink-3);font-weight:800}
+.rxtab .rxn{width:18px;color:var(--ink-3);font-weight:700}
 .rxtab th:last-child,.rxtab td:last-child{padding-right:0;width:38%}
 .rxsub{font-size:12px;color:var(--ink-3);margin-top:2px}
 .rxfreq{font-variant-numeric:tabular-nums;letter-spacing:.04em}
-.rxwd{border:1.5px solid #F3D3D1;background:var(--red-50);border-radius:12px;padding:11px 12px;
+.rxwd{border:1.5px solid #F0B8B4;background:var(--red-50);border-radius:12px;padding:11px 12px;
   margin:0 0 13px}
-.wdttl{font-weight:800;color:var(--red);font-size:14px;margin-bottom:5px}
+.wdttl{font-weight:700;color:var(--red);font-size:14px;margin-bottom:5px}
 .rxwd > div + div{display:flex;gap:9px;align-items:baseline;font-size:14px;margin-top:3px}
-.wdno{font-weight:800;color:var(--red);font-variant-numeric:tabular-nums;white-space:nowrap}
+.wdno{font-weight:700;color:var(--red);font-variant-numeric:tabular-nums;white-space:nowrap}
 .wdfoot{font-size:12px;color:var(--ink-3);margin-top:7px}
 /* The doctor answered "no withholding needed". Same box, read as reassurance rather
    than a warning, so it can never be mistaken for the red one. */
-.rxwd.ok{border-color:#CFE8D8;background:var(--green-50)}
-.rxwd.ok .wdttl{color:var(--ok)}
+.rxwd.ok{border-color:#8FD6AE;background:var(--green-50)}
+.rxwd.ok .wdttl{color:#0A5234}
 .rxfoot{border-top:1px dashed var(--line);margin-top:13px;padding-top:9px;font-size:11.5px;
   color:var(--ink-3)}
 .rxmeta{display:flex;flex-wrap:wrap;gap:4px 13px;margin-top:4px;font-variant-numeric:tabular-nums}
@@ -365,14 +377,14 @@ nav.tabbar[hidden]{display:none}
   box-shadow:inset 0 0 0 1.5px var(--line)}
 .medtop{display:flex;gap:9px;align-items:center}
 .medno{width:23px;height:23px;flex:none;border-radius:50%;background:var(--cta);color:#fff;
-  font-size:11.5px;font-weight:800;display:flex;align-items:center;justify-content:center}
+  font-size:11.5px;font-weight:700;display:flex;align-items:center;justify-content:center}
 .medtop .m-name{flex:1;min-width:0}
 .medx{flex:none;width:40px;height:40px;min-height:40px;border:0;border-radius:8px;
-  background:var(--red-50);color:var(--red);font-size:15px;font-weight:800;cursor:pointer;
+  background:var(--red-50);color:var(--red);font-size:15px;font-weight:700;cursor:pointer;
   font-family:inherit}
 .medgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-top:9px}
 .medgrid input,.medgrid select{min-height:44px;font-size:15px}
-.medgrid.wd input{background:var(--red-50);border-color:#F3D3D1}
+.medgrid.wd input{background:var(--red-50);border-color:#F0B8B4}
 .medgrid.wd input:disabled{background:var(--app);border-color:var(--line);opacity:.55}
 .wdnone{display:flex;gap:10px;align-items:center;margin:9px 0 0;font-size:13.5px;font-weight:700;
   color:var(--ink-2);cursor:pointer}
@@ -398,7 +410,7 @@ nav.tabbar[hidden]{display:none}
 .lrow{display:flex;align-items:center;gap:8px}
 .lrow .pin{font-size:15px}
 .lrow .lb{font-size:10.5px;color:var(--ink-3);font-weight:700;line-height:1.2}
-.lrow .lv{font-size:13.5px;font-weight:800;line-height:1.25}
+.lrow .lv{font-size:13.5px;font-weight:700;line-height:1.25}
 .lrow .av{width:34px;height:34px;border-radius:50%;background:var(--green-50);display:flex;
   align-items:center;justify-content:center;font-size:16px;margin-left:auto;flex:none}
 .sbar{display:flex;align-items:center;gap:9px;background:var(--app);border:1px solid var(--line-2);
@@ -413,19 +425,19 @@ nav.tabbar[hidden]{display:none}
   align-items:center;justify-content:center;font-size:23px;background:var(--cta-50);
   animation:deal .4s cubic-bezier(.2,1.1,.35,1) both}
 .cats a:nth-child(2) i{background:var(--green-50);animation-delay:.05s}
-.cats a:nth-child(3) i{background:#E9F1FB;animation-delay:.1s}
-.cats a:nth-child(4) i{background:#FBEAF2;animation-delay:.15s}
-.cats a:nth-child(5) i{background:#F0EDFB;animation-delay:.2s}
+.cats a:nth-child(3) i{background:var(--cta-50);animation-delay:.1s}
+.cats a:nth-child(4) i{background:var(--pink-50);animation-delay:.15s}
+.cats a:nth-child(5) i{background:var(--violet-50);animation-delay:.2s}
 @keyframes deal{from{opacity:0;transform:translateY(13px) scale(.85)}to{opacity:1;transform:none}}
 
 .carou{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;margin:14px -15px 0;padding:0 15px}
 .carou::-webkit-scrollbar{display:none}
 .ban{flex:none;width:272px;border-radius:12px;padding:13px 14px;display:flex;gap:11px;
   align-items:center;color:#fff}
-.ban.a{background:linear-gradient(110deg,#1557B8,#1D6FE0)}
-.ban.b{background:linear-gradient(110deg,#00796B,#00B38E)}
+.ban.a{background:linear-gradient(110deg,var(--cta-d),var(--cta))}
+.ban.b{background:linear-gradient(110deg,#0A5234,var(--green))}
 .ban .ic{font-size:27px}
-.ban b{display:block;font-size:13.5px;font-weight:800}
+.ban b{display:block;font-size:13.5px;font-weight:700}
 .ban span{font-size:11.5px;opacity:.92}
 .dots{display:flex;gap:5px;justify-content:center;margin-top:9px}
 .dots i{width:6px;height:6px;border-radius:50%;background:var(--line-2);transition:width .2s}
@@ -434,9 +446,9 @@ nav.tabbar[hidden]{display:none}
 .pad{padding-top:4px}
 .split{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
 .split a{background:var(--card);border-radius:12px;padding:13px;display:block;color:var(--ink);
-  box-shadow:0 1px 3px rgba(2,71,91,.07)}
+  box-shadow:0 1px 3px rgba(25,28,32,.07)}
 .split .e{font-size:25px;display:block;margin-bottom:7px}
-.split .t{font-size:13px;font-weight:800;line-height:1.25}
+.split .t{font-size:13px;font-weight:700;line-height:1.25}
 .split .s{font-size:10.5px;color:var(--ink-3);margin-top:2px}
 
 /* ---------------------------------------------------------------- footer + build tag */
@@ -484,7 +496,7 @@ nav.tabbar a.on .ic{animation:tabPop .32s cubic-bezier(.2,1.5,.4,1)}
 .specs{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:12px}
 .specs a{background:var(--card);border-radius:11px;padding:10px 3px 8px;text-align:center;display:block;
   font-size:9.5px;font-weight:700;line-height:1.25;color:var(--ink);
-  box-shadow:0 1px 3px rgba(2,71,91,.06)}
+  box-shadow:0 1px 3px rgba(25,28,32,.06)}
 .specs i{display:flex;width:38px;height:38px;margin:0 auto 5px;border-radius:50%;font-style:normal;
   align-items:center;justify-content:center;font-size:19px;background:var(--app);
   animation:deal .34s cubic-bezier(.2,.9,.3,1) both}
@@ -493,8 +505,8 @@ nav.tabbar a.on .ic{animation:tabPop .32s cubic-bezier(.2,1.5,.4,1)}
 .specs a:nth-child(5n+1) i{background:var(--red-50)}
 .specs a:nth-child(5n+2) i{background:var(--cta-50)}
 .specs a:nth-child(5n+3) i{background:var(--green-50)}
-.specs a:nth-child(5n+4) i{background:#FBEAF2}
-.specs a:nth-child(5n+5) i{background:#F0EDFB}
+.specs a:nth-child(5n+4) i{background:var(--pink-50)}
+.specs a:nth-child(5n+5) i{background:var(--violet-50)}
 .specs a:nth-child(2) i{animation-delay:.03s}
 .specs a:nth-child(3) i{animation-delay:.06s}
 .specs a:nth-child(4) i{animation-delay:.09s}
@@ -507,9 +519,9 @@ nav.tabbar a.on .ic{animation:tabPop .32s cubic-bezier(.2,1.5,.4,1)}
 
 /* ---------------------------------------------------------------- sign-in */
 .signin{text-align:center;padding:22px 4px 18px}
-.si-mark{width:76px;height:76px;border-radius:24px;margin:0 auto 14px;overflow:hidden;
-  box-shadow:0 6px 22px rgba(2,71,91,.18)}
-.si-mark img{width:100%;height:100%;display:block}
+.si-mark{display:flex;align-items:center;justify-content:center;gap:16px;margin:0 auto 14px}
+.si-mark img{width:58px;height:58px;display:block;flex:none}
+.si-mark .crest-rule{height:38px}
 .signin h1{font-size:21px;margin-bottom:6px}
 .si-sub{font-size:13px;color:var(--ink-2)}
 .orline{display:flex;align-items:center;gap:11px;margin:14px 0;color:var(--ink-3);font-size:12px;
@@ -518,7 +530,7 @@ nav.tabbar a.on .ic{animation:tabPop .32s cubic-bezier(.2,1.5,.4,1)}
 
 /* ---------------------------------------------------------------- profile + herd */
 .profnudge{display:block;background:linear-gradient(135deg,var(--cta-50),#fff)}
-.profnudge .go{font-size:19px;color:var(--cta);font-weight:800;flex:none}
+.profnudge .go{font-size:19px;color:var(--cta);font-weight:700;flex:none}
 .arow{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
 .arow:last-child{border-bottom:0}
 .arow .apic{font-size:23px;flex:none;width:34px;text-align:center}
@@ -553,11 +565,11 @@ nav.tabbar a.on .ic{animation:tabPop .32s cubic-bezier(.2,1.5,.4,1)}
 /* The saved panchayat reads as a committed value, not as a prompt. */
 .ahd .lv.set{color:var(--ink)}
 /* What the doctor sees about the owner when a case opens. */
-.ownerbox{background:#FFF8E6;border-radius:11px;padding:11px 12px;margin-top:10px;
+.ownerbox{background:var(--amber-50);border-radius:11px;padding:11px 12px;margin-top:10px;
   font-size:13px;line-height:1.5}
 .ownerbox b{display:block;font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;
   color:var(--ink-3);margin-bottom:4px}
-.ownerbox .chronic{margin-top:6px;padding-top:6px;border-top:1px solid rgba(2,71,91,.1)}
+.ownerbox .chronic{margin-top:6px;padding-top:6px;border-top:1px solid rgba(25,28,32,.1)}
 
 /* ---------------------------------------------------------------- tips */
 .tiprow{display:flex;gap:11px;align-items:flex-start;padding:10px 0;
@@ -577,22 +589,88 @@ nav.tabbar a.on .ic{animation:tabPop .32s cubic-bezier(.2,1.5,.4,1)}
 </style>
 </head>
 <body>
+<!-- ---------------------------------------------------------------- icons
+  One family, 24x24, one grid. Inline so there is no request, no dependency and
+  no device emoji font involved: 1FA7A (stethoscope), 1FA78 (blood), 1F9F4,
+  1FAB1 and 1FAA7 are Unicode 11-14 and render as empty boxes on Android 8-11,
+  whose emoji font cannot be updated. Every glyph the app used is a symbol here.
+  Colour comes from currentColor; size comes from the container's font-size.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true" focusable="false">
+<symbol id="i-vet" viewBox="0 0 24 24"><path d="M7 3v5a5 5 0 0 0 10 0V3"/><path d="M12 13v2.5a4.5 4.5 0 0 0 7.1 3.7"/><circle cx="20" cy="18" r="2.2"/></symbol>
+<symbol id="i-cases" viewBox="0 0 24 24"><path d="M9 3h6a1 1 0 0 1 1 1v1H8V4a1 1 0 0 1 1-1z"/><path d="M8 5H6.5A1.5 1.5 0 0 0 5 6.5v13A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5v-13A1.5 1.5 0 0 0 17.5 5H16"/><path d="M8.5 11h7M8.5 15h4.5"/></symbol>
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.6 12 3.4l9 7.2V20a1 1 0 0 1-1 1h-4.6v-6H8.6v6H4a1 1 0 0 1-1-1z"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></symbol>
+<symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.9-3.9"/></symbol>
+<symbol id="i-megaphone" viewBox="0 0 24 24"><path d="M3.5 11v2a1 1 0 0 0 1 1h2l6 3.8V6.2L6.5 10h-2a1 1 0 0 0-1 1z"/><path d="M16.5 9.2a4 4 0 0 1 0 5.6"/><path d="M19 6.7a7.5 7.5 0 0 1 0 10.6"/></symbol>
+<symbol id="i-clinic" viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V10l7-4.6 7 4.6v11"/><path d="M12 11.3v4.4M9.8 13.5h4.4"/></symbol>
+<symbol id="i-syringe" viewBox="0 0 24 24"><path d="m18 2 4 4M17 7l3-3"/><path d="M19 9 8.7 19.3a2.4 2.4 0 0 1-3.4 0l-.6-.6a2.4 2.4 0 0 1 0-3.4L15 5z"/><path d="m9 11 4 4M5 19l-3 3"/></symbol>
+<symbol id="i-ambulance" viewBox="0 0 24 24"><path d="M2 16.5V9.2A1.2 1.2 0 0 1 3.2 8H13v8.5"/><path d="M13 11h3.6l3.4 3.4v2.1"/><circle cx="7.6" cy="17.4" r="1.9"/><circle cx="16.6" cy="17.4" r="1.9"/><path d="M6.6 11.1v2.6M5.3 12.4h2.6"/></symbol>
+<symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8.5 3v4M15.5 3v4"/></symbol>
+<symbol id="i-camera" viewBox="0 0 24 24"><path d="M3 8.5h3.4L8 6h8l1.6 2.5H21v10a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/><circle cx="12" cy="13.5" r="3.4"/></symbol>
+
+<symbol id="i-cow" viewBox="0 0 24 24"><path d="M5.8 8.6C4.6 7 3 6.6 1.9 7.2c.3 1.6 1.7 2.6 3.5 2.7M18.2 8.6c1.2-1.6 2.8-2 3.9-1.4-.3 1.6-1.7 2.6-3.5 2.7"/><path d="M5.6 10.4c0-2.6 2.9-4.3 6.4-4.3s6.4 1.7 6.4 4.3v1.7c0 3.4-2.9 6.1-6.4 6.1s-6.4-2.7-6.4-6.1z"/><ellipse cx="12" cy="14.6" rx="3.4" ry="2.3"/><path d="M9.4 10.4h.01M14.6 10.4h.01" stroke-width="2.4"/></symbol>
+<symbol id="i-buffalo" viewBox="0 0 24 24"><path d="M6.8 9.3C4.5 9 2.7 7.5 2.4 5.5c2.3-.5 4.5.7 5.4 2.7M17.2 9.3c2.3-.3 4.1-1.8 4.4-3.8-2.3-.5-4.5.7-5.4 2.7"/><path d="M6.6 10.9c0-2.5 2.4-4 5.4-4s5.4 1.5 5.4 4v1.5c0 3.3-2.4 6-5.4 6s-5.4-2.7-5.4-6z"/><ellipse cx="12" cy="14.8" rx="2.9" ry="2.1"/><path d="M9.8 10.8h.01M14.2 10.8h.01" stroke-width="2.3"/></symbol>
+<symbol id="i-sheep" viewBox="0 0 24 24"><path d="M6.6 15.8a3 3 0 0 1-1.3-5.6 3 3 0 0 1 2.4-4.3 3.1 3.1 0 0 1 5.2-1.4 3 3 0 0 1 4.5 2.3 3 3 0 0 1 .3 5.6 3 3 0 0 1-2.9 3.4z"/><path d="M8.6 15.8v3.4M13.4 15.8v3.4"/><circle cx="17.6" cy="16.4" r="2.9"/><path d="M19.9 14.5c.9-.6 1.9-.4 2.5.4-.7.8-1.7 1-2.5.4"/><path d="M16.9 15.6h.01" stroke-width="2.2"/></symbol>
+<symbol id="i-goat" viewBox="0 0 24 24"><path d="M9.6 7.4C8.4 5.6 6.4 4.8 4.6 5.4c-.9.3-1.2 1.3-.6 2 .5.6 1.4.6 1.9 0"/><path d="M14.4 7.4c1.2-1.8 3.2-2.6 5-2 .9.3 1.2 1.3.6 2-.5.6-1.4.6-1.9 0"/><path d="M8.4 10.6c0-1.8 1.6-3 3.6-3s3.6 1.2 3.6 3v2.2c0 2.8-1.2 5-3.6 5s-3.6-2.2-3.6-5z"/><path d="M10.8 15h2.4"/><path d="M12 17.8v1.2c0 1.1-.6 2-1.6 2.4"/><path d="M10.3 11.2h.01M13.7 11.2h.01" stroke-width="2.2"/></symbol>
+<symbol id="i-poultry" viewBox="0 0 24 24"><path d="M12.6 4.8c.2-.9 1.3-1.1 1.8-.4.3-1 1.5-1.1 1.9-.2"/><circle cx="14.4" cy="7.6" r="2.8"/><path d="m17.2 7.8 2.6.8-2.6 1.1"/><path d="M13.2 10.3c-3.2.4-5.6 2.8-5.6 5.4 0 2.6 2.4 4.4 5.4 4.4 3.4 0 5.8-2 5.8-4.8 0-2-1-3.7-2.6-4.6"/><path d="M7.8 13.4c-1.6-1-3-1-4.2.2 1.4.6 2.2 1.6 2.4 2.8"/><path d="M11.4 20v1.4M15 20v1.4"/><path d="M15.2 7h.01" stroke-width="2.2"/></symbol>
+<symbol id="i-dog" viewBox="0 0 24 24"><path d="M8.4 7.2 6.1 5.1a.8.8 0 0 0-1.3.6l.2 5.6M15.6 7.2l2.3-2.1a.8.8 0 0 1 1.3.6l-.2 5.6"/><path d="M5 12.4c0-3 3.1-5.2 7-5.2s7 2.2 7 5.2c0 3.5-3.1 6.2-7 6.2s-7-2.7-7-6.2z"/><ellipse cx="12" cy="15" rx="2.8" ry="2"/><path d="M9.4 11.4h.01M14.6 11.4h.01" stroke-width="2.3"/></symbol>
+<symbol id="i-paw" viewBox="0 0 24 24"><ellipse cx="6.4" cy="10.2" rx="2" ry="2.5"/><ellipse cx="10" cy="6.6" rx="2" ry="2.6"/><ellipse cx="14.6" cy="6.8" rx="2" ry="2.6"/><ellipse cx="18" cy="10.6" rx="2" ry="2.4"/><path d="M12.2 13c3 0 5.3 2.2 5.3 4.4 0 1.8-1.5 2.9-3.3 2.9-.8 0-1.3-.3-2-.3s-1.2.3-2 .3c-1.8 0-3.3-1.1-3.3-2.9 0-2.2 2.3-4.4 5.3-4.4z"/></symbol>
+
+<symbol id="i-fever" viewBox="0 0 24 24"><path d="M14 14.8V5a2 2 0 1 0-4 0v9.8a4 4 0 1 0 4 0z"/><path d="M12 9.5v5.6"/></symbol>
+<symbol id="i-grain" viewBox="0 0 24 24"><path d="M12 21V10.5"/><path d="M12 15c0-4.2 2.3-7.4 6.4-8.8C18.7 11 16.4 14.4 12 15z"/><path d="M12 17.6C11.4 13.8 9 11 5.3 10.2c-.1 4 2.2 6.7 6.7 7.4z"/></symbol>
+<symbol id="i-blood" viewBox="0 0 24 24"><path d="M12 3.5s6 6.4 6 10.2a6 6 0 1 1-12 0C6 9.9 12 3.5 12 3.5z"/></symbol>
+<symbol id="i-bloat" viewBox="0 0 24 24"><ellipse cx="12" cy="13.6" rx="7.8" ry="6.2"/><circle cx="9.6" cy="12" r="1.6"/><circle cx="14.2" cy="11" r="1.2"/><circle cx="13.2" cy="15.6" r="2"/><path d="M2.4 13.6H.8M23.2 13.6h-1.6M12 5.8V4.2"/></symbol>
+<symbol id="i-bottle" viewBox="0 0 24 24"><path d="M9.6 2.8h4.8v2.4H9.6z"/><path d="M9.2 5.2h5.6l-.5 2.4h-4.6z"/><path d="M8.2 9.2a1.6 1.6 0 0 1 1.6-1.6h4.4a1.6 1.6 0 0 1 1.6 1.6v10.4a1.6 1.6 0 0 1-1.6 1.6H9.8a1.6 1.6 0 0 1-1.6-1.6z"/><path d="M8.2 12.4h2.4M8.2 15.6h2.4"/></symbol>
+<symbol id="i-milk" viewBox="0 0 24 24"><path d="M6.6 3.4h10.8l-1.1 16.1a1.6 1.6 0 0 1-1.6 1.5H9.3a1.6 1.6 0 0 1-1.6-1.5z"/><path d="M7.1 10.3h9.8"/></symbol>
+<symbol id="i-skin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.4"/><path d="M9.2 9.4h.01M14.6 8.8h.01M11.6 13h.01M15.2 14.4h.01M8.4 15h.01" stroke-width="2.4"/></symbol>
+<symbol id="i-drops" viewBox="0 0 24 24"><path d="M8 4.4s2.6 2.9 2.6 4.6a2.6 2.6 0 1 1-5.2 0C5.4 7.3 8 4.4 8 4.4z"/><path d="M16.4 7.6s2.4 2.7 2.4 4.3a2.4 2.4 0 1 1-4.8 0c0-1.6 2.4-4.3 2.4-4.3z"/><path d="M10.6 13.4s2.8 3.1 2.8 4.9a2.8 2.8 0 1 1-5.6 0c0-1.8 2.8-4.9 2.8-4.9z"/></symbol>
+
+<symbol id="i-phone" viewBox="0 0 24 24"><path d="M6.3 3.4h3.1l1.6 4.1-2.1 1.6a12.4 12.4 0 0 0 6 6l1.6-2.1 4.1 1.6v3.1a2.1 2.1 0 0 1-2.1 2.1A17 17 0 0 1 4.2 5.5a2.1 2.1 0 0 1 2.1-2.1z"/></symbol>
+<symbol id="i-video" viewBox="0 0 24 24"><rect x="2.6" y="6.4" width="12.8" height="11.2" rx="2.2"/><path d="m15.4 10.6 5.2-3.1v9.2l-5.2-3.1z"/></symbol>
+<symbol id="i-mobile" viewBox="0 0 24 24"><rect x="6.4" y="2.4" width="11.2" height="19.2" rx="2.6"/><path d="M10.4 18.4h3.2"/></symbol>
+<symbol id="i-map" viewBox="0 0 24 24"><path d="m9 4.6 6 2.2 5-2.2v12.6l-5 2.2-6-2.2-5 2.2V6.8z"/><path d="M9 4.6v12.6M15 6.8v12.6"/></symbol>
+<symbol id="i-print" viewBox="0 0 24 24"><path d="M7 8.4V3.6h10v4.8"/><rect x="3.6" y="8.4" width="16.8" height="7.6" rx="2"/><path d="M7 13.6h10v6.8H7z"/><path d="M17.4 11.6h.01" stroke-width="2.3"/></symbol>
+<symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 3.4 22 20.6H2z"/><path d="M12 9.6v4.4"/><path d="M12 17.2h.01" stroke-width="2.3"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6"/><path d="m8.2 12.2 2.6 2.6 5-5.2"/></symbol>
+<symbol id="i-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6"/><path d="m6.1 6.1 11.8 11.8"/></symbol>
+<symbol id="i-pill" viewBox="0 0 24 24"><path d="M13.8 3.9a5 5 0 0 1 7.1 7.1l-9.8 9.8a5 5 0 0 1-7.1-7.1z"/><path d="m8.2 8.2 7.6 7.6"/></symbol>
+<symbol id="i-worm" viewBox="0 0 24 24"><path d="M4.2 16.6c0-1.1.9-2 2-2 1.5 0 2.2-.7 2.4-2 .3-1.9 1.8-3.2 3.8-3.2h3.1a3.6 3.6 0 0 1 0 7.2H6.2a2 2 0 0 1-2-2z"/><path d="M15.2 13.6h.01M17.4 13.6h.01" stroke-width="2.1"/></symbol>
+<symbol id="i-tag" viewBox="0 0 24 24"><path d="M4.2 11.4V5a1.4 1.4 0 0 1 1.4-1.4H12l8.2 8.2a1.6 1.6 0 0 1 0 2.3l-6.3 6.3a1.6 1.6 0 0 1-2.3 0z"/><path d="M8.4 8h.01" stroke-width="2.6"/></symbol>
+<symbol id="i-snake" viewBox="0 0 24 24"><circle cx="19.4" cy="6.4" r="2.4"/><path d="M21.9 5.7h1.5m0 0-.9-.7m.9.7-.9.7"/><path d="M19.6 5.6h.01" stroke-width="2.1"/><path d="M17 6.4h-6.6a3.4 3.4 0 0 0 0 6.8h3a3.4 3.4 0 0 1 0 6.8H8.2"/></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20.4V10M10 20.4V4.6M16 20.4v-7.2M22 20.4H2"/></symbol>
+<symbol id="i-image" viewBox="0 0 24 24"><rect x="3.4" y="4.6" width="17.2" height="14.8" rx="2.2"/><circle cx="8.6" cy="9.8" r="1.8"/><path d="m3.4 16.8 4.8-4.2 4.2 3.6 3.4-2.8 4.8 4"/></symbol>
+<symbol id="i-poster" viewBox="0 0 24 24"><rect x="4.6" y="3.4" width="14.8" height="14.8" rx="2"/><path d="M8 7.4h3.2v3.2H8zM14 7.4h2.4M14 10.2h2.4M8 13.8h8.4"/><path d="M12 18.2v2.6M9 20.8h6"/></symbol>
+<symbol id="i-tools" viewBox="0 0 24 24"><path d="M20 5.4a5.2 5.2 0 0 1-6.9 6.9L5.6 19.8a2.3 2.3 0 0 1-3.3-3.3l7.5-7.5A5.2 5.2 0 0 1 16.7 2l-3.3 3.3.9 3.4 3.4.9z"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6"/><path d="M12 11.2v5"/><path d="M12 7.8h.01" stroke-width="2.3"/></symbol>
+<symbol id="i-flag" viewBox="0 0 24 24"><path d="M5.4 21V3.6"/><path d="M5.4 4.6h13.2l-2.6 4.2 2.6 4.2H5.4z"/></symbol>
+<symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3.6v11.2M7.6 10.6 12 15l4.4-4.4"/><path d="M4.4 19.4h15.2"/></symbol>
+<symbol id="i-book" viewBox="0 0 24 24"><path d="M4.4 5.2a2 2 0 0 1 2-2H19a.8.8 0 0 1 .8.8v13.6a.8.8 0 0 1-.8.8H6.4a2 2 0 0 0-2 2z"/><path d="M4.4 18.4a2 2 0 0 1 2-2h13.4"/><path d="M8.4 7.6h7M8.4 11h4.6"/></symbol>
+</svg>
 <header class="top">
   <div><div class="t">జనగామ పశు సేవ</div><div class="s">Jangaon Pashu Seva · District Administration</div></div>
   <div class="sp"></div>
-  <button id="instTop" hidden>📲 Install</button>
+  <button id="instTop" hidden><svg class="i" aria-hidden="true"><use xlink:href="#i-download" href="#i-download"/></svg> Install</button>
   <button id="langbtn" title="Language"></button>
 </header>
 <div id="splash">
-  <div class="blob b1"></div><div class="blob b2"></div>
-  <div class="blob b3"></div><div class="blob b4"></div>
-  <div class="grain"></div>
-  <div class="glass">
-    <div class="mk"><img src="icon-192.png" alt=""></div>
-    <div class="nm">జనగామ పశు సేవ</div>
-    <div class="sb">Jangaon Pashu Seva · Government veterinary care</div>
-    <div class="pb"><i></i></div>
+  <div class="crest">
+    <div class="crest-row">
+      <img src="img/emblem-telangana.png" width="74" height="74" alt="">
+      <span class="crest-rule"></span>
+      <img src="img/dept-animal-husbandry.png" width="74" height="74" alt="">
+    </div>
+    <div class="crest-cap">తెలంగాణ ప్రభుత్వం · పశుసంవర్ధక శాఖ
+      <span>Government of Telangana · Animal Husbandry Dept</span></div>
   </div>
+  <div class="sp-hero">
+    <div class="nm">జనగామ పశు సేవ</div>
+    <div class="sb">ఉచిత వైద్య సలహా · ప్రభుత్వ డాక్టర్ కాల్ చేస్తారు</div>
+  </div>
+  <div class="pb"><i></i></div>
+  <div class="sp-foot">Jangaon District · 12 mandals · Veterinary &amp; AH Dept</div>
 </div>
 <div id="toast"></div>
 <div id="nprog"></div>

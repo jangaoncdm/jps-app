@@ -11,3 +11,12 @@ Species tile photos, sourced from Wikimedia Commons under free licenses:
 - **poultry** — "File:Asil rooster, also known as Aseel.jpg" by சு.பத்மா, CC BY-SA 4.0 — via Wikimedia Commons (https://commons.wikimedia.org/wiki/File:Asil_rooster,_also_known_as_Aseel.jpg)
 - **poultry** — "File:Hint horozu ( Aseel Rooster).jpg" by İsmail Alkan , Yağmur Kuşçu , Tunahan Sancak  , Nazmi Atasoy , Hasan Hüseyin Arı , Sema Uslu, CC BY 4.0 — via Wikimedia Commons (https://commons.wikimedia.org/wiki/File:Hint_horozu_(_Aseel_Rooster).jpg)
 - **poultry** — "File:Aseel Rooster.jpg" by Ani Vincent, CC0 — via Wikimedia Commons (https://commons.wikimedia.org/wiki/File:Aseel_Rooster.jpg)
+
+## Official marks
+
+- **Emblem of Telangana** — "File:Emblem of Telangana.svg", Government of Telangana — via Wikimedia
+  (https://en.wikipedia.org/wiki/Government_of_Telangana). A state emblem, used here under the
+  district's own authority as a DV&AHO Jangaon application. See `Logo/README.md`.
+- **Dept of Animal Husbandry, Dairy Development & Fisheries roundel** — supplied by the owner as a
+  screen capture; circle-cropped, outer ring text unrecoverable. Provisional until the department
+  supplies the original.

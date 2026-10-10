@@ -1,16 +1,16 @@
-/* JPS app.js — BUILD JPS v0.7.1-M6 b011
+/* JPS app.js — BUILD JPS v0.7.1-M6 b012
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.7.1-M6 b011';
+var BUILD = 'JPS v0.7.1-M6 b012';
 
 var SPECIES = [
-  { v:'cow', te:'ఆవు', en:'Cow', pic:'🐄' }, { v:'buffalo', te:'గేదె', en:'Buffalo', pic:'🐃' },
-  { v:'sheep', te:'గొర్రె', en:'Sheep', pic:'🐑' }, { v:'goat', te:'మేక', en:'Goat', pic:'🐐' },
-  { v:'poultry', te:'కోడి', en:'Poultry', pic:'🐔' }, { v:'dog', te:'కుక్క', en:'Dog', pic:'🐕' },
-  { v:'other', te:'ఇతర', en:'Other', pic:'🐾' }
+  { v:'cow', te:'ఆవు', en:'Cow', ic:'cow' }, { v:'buffalo', te:'గేదె', en:'Buffalo', ic:'buffalo' },
+  { v:'sheep', te:'గొర్రె', en:'Sheep', ic:'sheep' }, { v:'goat', te:'మేక', en:'Goat', ic:'goat' },
+  { v:'poultry', te:'కోడి', en:'Poultry', ic:'poultry' }, { v:'dog', te:'కుక్క', en:'Dog', ic:'dog' },
+  { v:'other', te:'ఇతర', en:'Other', ic:'paw' }
 ];
 var SYMPTOMS = [
   { v:'fever', te:'జ్వరం', en:'Fever' }, { v:'not_eating', te:'మేత తినడం లేదు', en:'Not eating' },
@@ -22,10 +22,22 @@ var SYMPTOMS = [
 // One glyph per problem. They used to share a single bandage icon, which made the
 // grid unreadable at a glance - the icon is what the eye lands on, not the caption.
 var SYMPTOM_ICON = {
-  fever: '🌡️', not_eating: '🌾', injury: '🩸', bloat: '🎈',
-  delivery: '🍼', mastitis: '🥛', skin: '🧴', diarrhea: '💧',
-  other: '🩺'
+  fever: 'fever', not_eating: 'grain', injury: 'blood', bloat: 'bloat',
+  delivery: 'bottle', mastitis: 'milk', skin: 'skin', diarrhea: 'drops',
+  other: 'vet'
 };
+
+/* One drawn icon family, shipped as a <symbol> sprite inside index.html. It
+   replaces 62 device emoji. Five of those were Unicode 11-14 (1FA7A stethoscope,
+   1FA78 blood, 1F9F4, 1FAB1, 1FAA7) and Android 8-11 cannot render them at all -
+   its emoji font is not updatable - so they shipped as empty boxes, including the
+   stethoscope on the main "ask a vet" button. Size comes from the container's
+   font-size and colour from currentColor, so the CSS that sized an emoji still works.
+   Never use this where the result is escaped or assigned to textContent. */
+function icon(n) {
+  return '<svg class="i" aria-hidden="true" focusable="false">' +
+    '<use xlink:href="#i-' + n + '" href="#i-' + n + '"/></svg>';
+}
 
 // backend still records a symptom per case; derive it from the chosen catalogue service
 var SERVICE2SYMPTOM = {
@@ -263,7 +275,7 @@ function render(html) {
 function badge(st) {
   return '<span class="badge b-' + esc(st) + '">' + esc(T(STATUS_TE[st] || st, STATUS_EN[st] || st)) + '</span>';
 }
-function spLabel(v) { var s = SPECIES.find(function (x) { return x.v === v; }); return s ? s.pic + ' ' + T(s.te, s.en) : v; }
+function spLabel(v) { var s = SPECIES.find(function (x) { return x.v === v; }); return s ? T(s.te, s.en) : v; }
 function syLabel(v) { var s = SYMPTOMS.find(function (x) { return x.v === v; }); return s ? T(s.te, s.en) : v; }
 function mapsLink(lat, lng) {
   return 'https://www.google.com/maps/dir/?api=1&destination=' + lat + ',' + lng;
@@ -271,8 +283,8 @@ function mapsLink(lat, lng) {
 function facilityCard(f, title) {
   if (!f) return '';
   var dir = (f.lat && f.lng)
-    ? '<a class="btn small ghost" target="_blank" rel="noopener" href="' + mapsLink(f.lat, f.lng) + '">🗺️ ' + esc(T('దారి చూపించు', 'Directions')) + '</a>' : '';
-  var call = f.mobile ? '<a class="btn small" href="tel:' + esc(f.mobile) + '">📞 ' + esc(T('డాక్టర్‌కు కాల్', 'Call doctor')) + '</a>' : '';
+    ? '<a class="btn small ghost" target="_blank" rel="noopener" href="' + mapsLink(f.lat, f.lng) + '">' + icon('map') + ' ' + esc(T('దారి చూపించు', 'Directions')) + '</a>' : '';
+  var call = f.mobile ? '<a class="btn small" href="tel:' + esc(f.mobile) + '">' + icon('phone') + ' ' + esc(T('డాక్టర్‌కు కాల్', 'Call doctor')) + '</a>' : '';
   return '<div class="fac"><div class="hint">' + esc(title || T('మీ కేంద్రం', 'Your centre')) + '</div>' +
     '<div class="nm">' + esc(f.name) + '</div>' +
     (f.incharge ? '<div>' + esc(T('డాక్టర్', 'Doctor')) + ': <b>' + esc(f.incharge) + '</b></div>' : '') +
@@ -498,7 +510,9 @@ function vIdentify(msg) {
   stopPoll();
   render(
     '<div class="signin">' +
-      '<div class="si-mark"><img src="icon-192.png" alt=""></div>' +
+      '<div class="si-mark"><img src="img/emblem-telangana.png" width="58" height="58" alt="">' +
+        '<span class="crest-rule"></span>' +
+        '<img src="img/dept-animal-husbandry.png" width="58" height="58" alt=""></div>' +
       '<h1>' + esc(T('పశువుకు వైద్య సహాయం ఒక్క ట్యాప్ దూరం',
         'Veterinary help for your animal, one tap away')) + '</h1>' +
       '<p class="si-sub">' + esc(T('ప్రభుత్వ పశు వైద్యం · పూర్తిగా ఉచితం',
@@ -506,7 +520,7 @@ function vIdentify(msg) {
     '</div>' +
     (msg ? '<div class="err">' + esc(msg) + '</div>' : '') +
     '<div class="card">' +
-      '<button class="btn" id="hintbtn">📱 ' +
+      '<button class="btn" id="hintbtn">' + icon('mobile') + ' ' +
         esc(T('నా నంబర్‌తో కొనసాగండి', 'Continue with my number')) + '</button>' +
       '<div class="orline"><span>' + esc(T('లేదా', 'or')) + '</span></div>' +
       '<label style="margin-top:0">' + TL('మొబైల్ నంబర్', 'Mobile number') + '</label>' +
@@ -519,7 +533,7 @@ function vIdentify(msg) {
         esc(T('OTP అవసరం లేదు · పాస్‌వర్డ్ లేదు', 'No OTP, no password')) + '</p>' +
     '</div>' +
     '<a class="sosbar" href="tel:1962">' +
-      '<span class="sb-ic">🚑</span>' +
+      '<span class="sb-ic">' + icon('ambulance') + '</span>' +
       '<span><b>' + esc(T('అత్యవసరమా? 1962', 'Emergency? Call 1962')) + '</b>' +
       '<span class="hint">' + esc(T('24 గంటలూ ఉచిత సహాయం', 'Free state helpline, 24 hours')) + '</span></span></a>' +
     '<div class="card"><label style="margin-top:0">' + TL('భాష', 'Language') + '</label>' + langChips() + '</div>' +
@@ -627,7 +641,7 @@ function paintHome(data) {
       '<div class="hint">' + esc(String(b.at).slice(0, 10)) + '</div></div>';
   }).join('');
   var noticesCard = notices
-    ? '<div class="card"><h2>📢 ' + TL('ప్రకటనలు', 'Notices') + '</h2>' + notices + '</div>' : '';
+    ? '<div class="card"><h2>' + icon('megaphone') + ' ' + TL('ప్రకటనలు', 'Notices') + '</h2>' + notices + '</div>' : '';
 
   var rows = d.requests.map(function (r) {
     return '<tr><td><a href="#t/' + esc(r.ticket) + '"><b>' + esc(r.ticket) + '</b></a><br>' +
@@ -651,32 +665,32 @@ function paintHome(data) {
 
   var header =
     '<div class="ahd">' +
-      '<div class="lrow"><span class="pin">📍</span>' +
+      '<div class="lrow"><span class="pin">' + icon('pin') + '</span>' +
         '<a href="#loc" style="color:inherit"><div class="lb">' + S1('మీ గ్రామ పంచాయతీ', 'Your Gram Panchayat') + '</div>' +
           '<div class="lv' + (placed ? ' set' : '') + '">' + place + ' ▾</div></a>' +
-        '<a class="av" href="#profile">👤</a></div>' +
-      '<a class="sbar" href="#new">🔍 <span>' +
+        '<a class="av" href="#profile">' + icon('person') + '</a></div>' +
+      '<a class="sbar" href="#new">' + icon('search') + ' <span>' +
         S1('జ్వరం, ఈత, టీకా… వెతకండి', 'Fever, calving, vaccination…') +
         '</span></a>' +
     '</div>';
 
   var cats =
     '<div class="cats">' +
-      '<a href="#new"><i>🩺</i>' + S1('సలహా', 'Ask a vet') + '</a>' +
-      '<a href="#cases"><i>📋</i>' + S1('నా కేసులు', 'My cases') + '</a>' +
-      '<a href="#animals"><i>🐄</i>' + S1('నా పశువులు', 'My animals') + '</a>' +
-      '<a href="#centre"><i>🏥</i>' + S1('కేంద్రం', 'My centre') + '</a>' +
-      '<a href="#vacc"><i>💉</i>' + S1('టీకాలు', 'Vaccination') + '</a>' +
-      '<a href="#profile"><i>👤</i>' + S1('నా ప్రొఫైల్', 'My profile') + '</a>' +
-      '<a href="#tips"><i>📗</i>' + S1('సూచనలు', 'Care tips') + '</a>' +
+      '<a href="#new"><i>' + icon('vet') + '</i>' + S1('సలహా', 'Ask a vet') + '</a>' +
+      '<a href="#cases"><i>' + icon('cases') + '</i>' + S1('నా కేసులు', 'My cases') + '</a>' +
+      '<a href="#animals"><i>' + icon('cow') + '</i>' + S1('నా పశువులు', 'My animals') + '</a>' +
+      '<a href="#centre"><i>' + icon('clinic') + '</i>' + S1('కేంద్రం', 'My centre') + '</a>' +
+      '<a href="#vacc"><i>' + icon('syringe') + '</i>' + S1('టీకాలు', 'Vaccination') + '</a>' +
+      '<a href="#profile"><i>' + icon('person') + '</i>' + S1('నా ప్రొఫైల్', 'My profile') + '</a>' +
+      '<a href="#tips"><i>' + icon('book') + '</i>' + S1('సూచనలు', 'Care tips') + '</a>' +
     '</div>';
 
   var bans = bcs.map(function (b, k) {
-    return '<div class="ban ' + (k % 2 ? 'b' : 'a') + '"><span class="ic">📢</span>' +
+    return '<div class="ban ' + (k % 2 ? 'b' : 'a') + '"><span class="ic">' + icon('megaphone') + '</span>' +
       '<div><b>' + esc(b.title) + '</b><span>' + esc((b.body || '').slice(0, 64)) + '</span></div></div>';
   });
   if (!bans.length) {
-    bans.push('<div class="ban a"><span class="ic">🩺</span><div><b>' +
+    bans.push('<div class="ban a"><span class="ic">' + icon('vet') + '</span><div><b>' +
       esc(T('ఉచిత వైద్య సలహా', 'Free veterinary advice')) +
       '</b><span>' + esc(T('ప్రభుత్వ పశు వైద్యులు · 24×7', 'Government vets · 24×7')) + '</span></div></div>');
   }
@@ -696,7 +710,7 @@ function paintHome(data) {
   // #1: one nudge to finish the profile, and only while it is unfinished
   var profNudge = (prof.complete === false)
     ? '<a class="card profnudge" href="#profile">' +
-        '<div class="rowline"><span style="font-size:23px">👤</span>' +
+        '<div class="rowline"><span style="font-size:23px">' + icon('person') + '</span>' +
         '<div style="flex:1;min-width:0"><b style="font-size:14px">' +
           esc(T('ప్రొఫైల్ పూర్తి చేయండి', 'Finish your profile')) + '</b>' +
         '<div class="en">' + esc(T('ఒక్కసారి నింపండి — ప్రతి అభ్యర్థనలో మళ్లీ అడగం',
@@ -707,10 +721,10 @@ function paintHome(data) {
   var split =
     '<div class="sh"><h2>' + S1('సలహా కావాలా?', 'Need advice?') + '</h2></div>' +
     '<div class="split">' +
-      '<a href="#new"><span class="e">📹</span><div class="t">' +
+      '<a href="#new"><span class="e">' + icon('video') + '</span><div class="t">' +
         S1('ఆన్‌లైన్ సలహా', 'Online advice') + '</div>' +
         '<div class="s">' + S1('డాక్టర్ కాల్ చేస్తారు', 'A vet calls you back') + '</div></a>' +
-      '<a href="#new"><span class="e">🏥</span><div class="t">' +
+      '<a href="#new"><span class="e">' + icon('clinic') + '</span><div class="t">' +
         S1('కేంద్రంలో', 'At the centre') + '</div>' +
         '<div class="s">' + S1('సందర్శన ఖరారు', 'The vet schedules a visit') + '</div></a>' +
     '</div>';
@@ -719,7 +733,7 @@ function paintHome(data) {
     ? '<div class="sh"><h2>' + S1('మీ పశు వైద్య కేంద్రం', 'Your veterinary centre') + '</h2>' +
         '<a href="#centre">' + S1('వివరాలు', 'Details') + '</a></div>' +
       '<a class="card" href="#centre" style="display:block">' +
-        '<div class="rowline"><span style="font-size:23px">🏥</span>' +
+        '<div class="rowline"><span style="font-size:23px">' + icon('clinic') + '</span>' +
         '<div style="flex:1;min-width:0"><b style="font-size:14px">' + esc(fac.name) + '</b>' +
         '<div class="en">' + esc(fac.code || '') + (fac.village ? ' · ' + esc(fac.village) : '') + '</div></div></div>' +
         '<div class="en" style="margin-top:9px;padding-top:9px;border-top:1px solid var(--line)">' +
@@ -729,7 +743,7 @@ function paintHome(data) {
 
   // #6: every problem carries its own glyph
   var probs = SYMPTOMS.slice(0, 8).map(function (y) {
-    return '<a href="#new/' + esc(y.v) + '"><i>' + (SYMPTOM_ICON[y.v] || '🩺') + '</i>' +
+    return '<a href="#new/' + esc(y.v) + '"><i>' + icon(SYMPTOM_ICON[y.v] || 'vet') + '</i>' +
       esc(T(y.te, y.en)) + '</a>';
   }).join('');
 
@@ -739,7 +753,7 @@ function paintHome(data) {
     profNudge +
     liveCard +
     '<a class="sosbar" href="tel:1962">' +
-      '<span class="sb-ic">🚑</span>' +
+      '<span class="sb-ic">' + icon('ambulance') + '</span>' +
       '<span><b>' + esc(T('అత్యవసరమా? 1962', 'Emergency? Call 1962')) + '</b>' +
       '<span class="hint">' + esc(T('24 గంటలూ ఉచిత సహాయం', 'Free state helpline, 24 hours')) + '</span></span></a>' +
     split +
@@ -790,15 +804,15 @@ function paintProfile(data) {
       (String(u.mandal_id) === String(m.id) ? ' selected' : '') + '>' + esc(m.name) + '</option>';
   }).join('');
   var spOpts = SPECIES.map(function (x) {
-    return '<option value="' + x.v + '">' + x.pic + '  ' + esc(T(x.te, x.en)) + '</option>';
+    return '<option value="' + x.v + '">' + esc(T(x.te, x.en)) + '</option>';
   }).join('');
 
   var animalRows = prof.animals.map(function (a) {
-    var sp = SPECIES.find(function (x) { return x.v === a.species; }) || { pic: '🐾' };
+    var sp = SPECIES.find(function (x) { return x.v === a.species; }) || { ic: 'paw' };
     var age = a.age_years
       ? a.age_years + ' ' + T('సంవత్సరాలు', 'yr')
       : T('వయస్సు ఇవ్వలేదు', 'age not given');
-    return '<div class="arow"><span class="apic">' + sp.pic + '</span>' +
+    return '<div class="arow"><span class="apic">' + icon(sp.ic) + '</span>' +
       '<div class="ainfo"><b>' + esc(a.name || spLabel(a.species)) + '</b>' +
       '<div class="en">' + esc(age) +
         (a.pashu_tag ? ' · ' + T('ట్యాగ్', 'Tag') + ' ' + esc(a.pashu_tag) : '') +
@@ -913,7 +927,7 @@ function vNew(want) {
         '<span class="media">' +
           '<img class="spimg" src="img/' + sp.v + '.jpg" alt="" ' +
           'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'block\'">' +
-          '<span class="pic" style="display:none">' + sp.pic + '</span>' +
+          '<span class="pic" style="display:none">' + icon(sp.ic) + '</span>' +
         '</span>' +
         '<span class="cap"><b>' + esc(S.lang === 'en' ? sp.en : sp.te) + '</b>' +
         (S.lang === 'both' ? '<span class="en">' + esc(sp.en) + '</span>' : '') + '</span></label>';
@@ -931,7 +945,7 @@ function vNew(want) {
     var svcOpts = cats.map(function (c) {
       var inner = M.services.filter(function (x) { return x.category === c; }).map(function (x) {
         return '<option value="' + esc(x.code) + '"' + (x.code === wantCode ? ' selected' : '') + '>' +
-          (x.emergency ? '🔴 ' : '') + esc(T(x.te, x.en)) + '</option>';
+          esc((x.emergency ? T('అత్యవసరం · ', 'Emergency · ') : '') + T(x.te, x.en)) + '</option>';
       }).join('');
       return '<optgroup label="' + esc(c) + '">' + inner + '</optgroup>';
     }).join('');
@@ -950,7 +964,7 @@ function vNew(want) {
 
     var whereBlock = known
       ? '<div class="known" id="known">' +
-          '<span class="ic">📍</span>' +
+          '<span class="ic">' + icon('pin') + '</span>' +
           '<div><b>' + esc(u.name) + '</b>' +
             '<div class="en">' + esc([u.gp || u.village, mName].filter(Boolean).join(', ')) + '</div></div>' +
           '<a href="#profile" class="chg">' + esc(T('మార్చండి', 'Change')) + '</a>' +
@@ -970,8 +984,8 @@ function vNew(want) {
     // the ear tags already on the profile become a picker instead of a free field
     var tagOpts = (prof.animals || []).filter(function (a) { return a.pashu_tag; })
       .map(function (a) {
-        var sp = SPECIES.find(function (x) { return x.v === a.species; }) || { pic: '' };
-        return '<option value="' + esc(a.pashu_tag) + '">' + sp.pic + ' ' + esc(a.pashu_tag) +
+        var sp = SPECIES.find(function (x) { return x.v === a.species; }) || { te: '', en: '' };
+        return '<option value="' + esc(a.pashu_tag) + '">' + esc(a.pashu_tag) +
           (a.name ? ' · ' + esc(a.name) : '') + '</option>';
       }).join('');
 
@@ -993,7 +1007,7 @@ function vNew(want) {
             tagOpts + '<option value="__new">+ ' + esc(T('వేరే ట్యాగ్', 'Another tag')) + '</option></select>' +
           '<input id="tg" type="text" maxlength="20" inputmode="numeric" hidden>'
         : '<input id="tg" type="text" maxlength="20" inputmode="numeric">') +
-      '<div class="rowline"><button class="btn small ghost" id="loc">📍 ' +
+      '<div class="rowline"><button class="btn small ghost" id="loc">' + icon('pin') + ' ' +
         esc(T('నా లొకేషన్ జోడించు', 'Attach my location')) + '</button><span class="hint" id="locst"></span></div>' +
       '<div style="height:6px"></div>' +
       '<label class="emg"><input id="em" type="checkbox"><span><b>' + esc(T('అత్యవసరం', 'Emergency')) + '</b><br>' +
@@ -1011,7 +1025,7 @@ function vNew(want) {
       var svc = M.services.find(function (x) { return x.code === el('svc').value; });
       if (svc && svc.emergency) el('em').checked = true;
       el('svcinfo').innerHTML = svc
-        ? '<p class="hint">' + (svc.emergency ? '🔴 ' : '') +
+        ? '<p class="hint">' + (svc.emergency ? '<span class="dot red"></span>' : '') +
           esc(T('లక్ష్య స్పందన', 'Target response')) + ': ' +
           esc(svc.sla_raw || (svc.sla_min + ' min')) + '</p>' : '';
     };
@@ -1101,18 +1115,18 @@ function vTicket(ticket) {
     var op = staff && r.owner_profile ? r.owner_profile : null;
     var ownerBox = op && (op.count || op.chronic)
       ? '<div class="ownerbox"><b>Owner profile</b>' +
-          (op.count ? '🐄 ' + esc(op.herd) + ' (' + esc(op.count) + ')' : '') +
+          (op.count ? icon('cow') + ' ' + esc(op.herd) + ' (' + esc(op.count) + ')' : '') +
           (op.gp ? '<div class="en">' + esc(op.gp) + (op.village && op.village !== op.gp ? ', ' + esc(op.village) : '') + '</div>' : '') +
           (op.chronic ? '<div class="chronic"><b>Long-running</b>' + esc(op.chronic) + '</div>' : '') +
         '</div>'
       : '';
     var farmLoc = staff && r.farm_lat && r.farm_lng
-      ? '<p><a target="_blank" rel="noopener" href="' + mapsLink(r.farm_lat, r.farm_lng) + '">🗺️ User location on map</a></p>' : '';
+      ? '<p><a target="_blank" rel="noopener" href="' + mapsLink(r.farm_lat, r.farm_lng) + '">' + icon('map') + ' User location on map</a></p>' : '';
     var visit = r.visit_date
-      ? '<p>📅 ' + esc(T('సందర్శన', 'Visit')) + ': <b>' + esc(r.visit_date) + (r.visit_slot ? ' — ' + esc(r.visit_slot) : '') + '</b></p>' : '';
+      ? '<p>' + icon('calendar') + ' ' + esc(T('సందర్శన', 'Visit')) + ': <b>' + esc(r.visit_date) + (r.visit_slot ? ' — ' + esc(r.visit_slot) : '') + '</b></p>' : '';
     var photo = r.photo ? '<p><img class="ph" src="data:' + esc(r.photo.mime) + ';base64,' + esc(r.photo.b64) + '"></p>' : '';
     var report = r.diagnosis
-      ? '<div class="card"><h2>🩺 ' + TL('డాక్టర్ నివేదిక', "Doctor's report") + '</h2>' +
+      ? '<div class="card"><h2>' + icon('vet') + ' ' + TL('డాక్టర్ నివేదిక', "Doctor's report") + '</h2>' +
         '<p>' + esc(r.diagnosis) + '</p>' +
         (r.vet ? '<p class="hint">— ' + esc(r.vet.name) + '</p>' : '') + '</div>' : '';
     var rx = (r.prescriptions || []).map(function (p) {
@@ -1163,7 +1177,7 @@ function vTicket(ticket) {
           esc(T('గంటలు', 'hours')) + '</span>' + esc(T('పాలు వాడవద్దు / అమ్మవద్దు', 'Do not use or sell milk')) + '</div>');
         if (p.withdraw_meat_d) parts.push('<div><span class="wdno">' + esc(p.withdraw_meat_d) + ' ' +
           esc(T('రోజులు', 'days')) + '</span>' + esc(T('మాంసానికి పంపవద్దు', 'Do not send for meat')) + '</div>');
-        wd = '<div class="rxwd"><div class="wdttl">⚠️ ' +
+        wd = '<div class="rxwd"><div class="wdttl">' + icon('warn') + ' ' +
           esc(T('ఔషధ విరమణ కాలం', 'Withdrawal period')) + '</div>' + parts.join('') +
           '<div class="wdfoot">' + esc(T('చివరి మోతాదు నుంచి లెక్కించండి',
             'Counted from the last dose given')) + '</div></div>';
@@ -1171,7 +1185,7 @@ function vTicket(ticket) {
         // cleanMed promises that "the doctor declared none is needed" can never be read as
         // "nobody answered" — but both printed an empty slip, which is the one reading that
         // matters for milk. Say it explicitly. wd_none rides along in meds_json already.
-        wd = '<div class="rxwd ok"><div class="wdttl">✅ ' +
+        wd = '<div class="rxwd ok"><div class="wdttl">' + icon('check') + ' ' +
           esc(T('ఔషధ విరమణ కాలం', 'Withdrawal period')) + '</div>' +
           '<div>' + esc(T('ఈ మందులకు పాలు / మాంసం ఆపాల్సిన అవసరం లేదు — డాక్టర్ నిర్ధారించారు',
             'No milk or meat withholding needed for these medicines — confirmed by the doctor')) +
@@ -1194,7 +1208,7 @@ function vTicket(ticket) {
           '<span>' + esc(r.ticket) + '</span></div></div>';
 
       return '<div class="card rxcard">' + head + body + foot +
-        '<div class="rowline"><button class="btn small ghost" onclick="window.print()">🖨️ ' +
+        '<div class="rowline"><button class="btn small ghost" onclick="window.print()">' + icon('print') + ' ' +
         esc(T('ప్రింట్ / సేవ్', 'Print / save')) + '</button></div></div>';
     }).join('');
     var svcLine = r.service ? '<p>' + esc(T(r.service.te, r.service.en)) + ' <span class="hint">(' + esc(r.service.code) + ')</span></p>' : '';
@@ -1210,16 +1224,16 @@ function vTicket(ticket) {
       if (r.status === 'ESCALATED') {
         video += '<div class="tip warn"><b>' + esc(T('1962 / MVC బృందం సంప్రదిస్తారు',
           'The 1962 / MVC team will contact you')) + '</b></div>' +
-          '<a class="btn red" href="tel:1962">🚑 ' + esc(T('1962కి కాల్ చేయండి', 'Call 1962 now')) + '</a>' +
+          '<a class="btn red" href="tel:1962">' + icon('ambulance') + ' ' + esc(T('1962కి కాల్ చేయండి', 'Call 1962 now')) + '</a>' +
           '<div style="height:8px"></div>';
       }
       if (docPhone) {
         video += '<div class="rowline">' +
-          '<a class="btn small" href="tel:' + esc(docPhone) + '">📞 ' + esc(docLabel) + '</a>' +
+          '<a class="btn small" href="tel:' + esc(docPhone) + '">' + icon('phone') + ' ' + esc(docLabel) + '</a>' +
           '<a class="btn small" style="background:#128C7E" target="_blank" rel="noopener" href="https://wa.me/' +
-          esc(String(docPhone).replace(/\D/g, '')) + '">📹 ' + esc(T('WhatsApp వీడియో కాల్', 'WhatsApp video call')) + '</a></div>' +
-          '<p class="hint">' + esc(T('WhatsApp తెరుచుకుంటుంది — పైన 📹 గుర్తు నొక్కితే డాక్టర్‌కు కాల్ వెళ్తుంది',
-            'WhatsApp opens on the doctor chat — tap the 📹 icon at the top to ring them')) + '</p>' +
+          esc(String(docPhone).replace(/\D/g, '')) + '">' + icon('video') + ' ' + esc(T('WhatsApp వీడియో కాల్', 'WhatsApp video call')) + '</a></div>' +
+          '<p class="hint">' + esc(T('WhatsApp తెరుచుకుంటుంది — పైన వీడియో కాల్ గుర్తు నొక్కితే డాక్టర్‌కు కాల్ వెళ్తుంది',
+            'WhatsApp opens on the doctor chat — tap the video-call icon at the top to ring them')) + '</p>' +
           '<div style="height:8px"></div>';
       }
     }
@@ -1230,9 +1244,9 @@ function vTicket(ticket) {
         (r.status === 'NEW'
           ? '<button class="btn" id="claim">Claim this case</button>'
           : '<div class="rowline"><a class="btn small wa" id="vcall" target="_blank" rel="noopener" href="https://wa.me/' +
-            esc(String(r.farmer.phone).replace(/\D/g, '')) + '">📹 WhatsApp video call</a>' +
-            '<a class="btn small" href="tel:' + esc(r.farmer.phone) + '">📞 Call user</a></div>' +
-            '<p class="hint">WhatsApp opens on their chat — tap the 📹 icon at the top to ring them. Their phone rings like any WhatsApp call, even locked.</p>' +
+            esc(String(r.farmer.phone).replace(/\D/g, '')) + '">' + icon('video') + ' WhatsApp video call</a>' +
+            '<a class="btn small" href="tel:' + esc(r.farmer.phone) + '">' + icon('phone') + ' Call user</a></div>' +
+            '<p class="hint">WhatsApp opens on their chat — tap the video-call icon at the top to ring them. Their phone rings like any WhatsApp call, even locked.</p>' +
             '<label>Observation &amp; diagnosis <span class="en">(required to resolve)</span></label>' +
             '<textarea id="note" maxlength="1000" placeholder="Findings · diagnosis · advice to the user"></textarea>' +
             '<div class="rowline2"><div><label>Weight (kg)</label><input id="wkg" type="number" inputmode="decimal" min="0" max="2000" placeholder="410"></div>' +
@@ -1409,7 +1423,7 @@ function paintAnimals(data) {
 
   var cards = items.map(function (x) {
     var a = x.a, rows = hist[x.key] || [];
-    var sp = SPECIES.find(function (y) { return y.v === a.species; }) || { pic: '🐾' };
+    var sp = SPECIES.find(function (y) { return y.v === a.species; }) || { ic: 'paw' };
     // #7: guidance that follows the KIND of animal, not a generic list
     var care = speciesCare(a.species).map(function (c) {
       return '<div class="crow"><span>•</span><div>' + TL(c[0], c[1]) + '</div></div>';
@@ -1427,7 +1441,7 @@ function paintAnimals(data) {
       ? a.age_years + ' ' + T('సంవత్సరాలు', 'yr') : '';
 
     return '<div class="card">' +
-      '<div class="rowline"><span style="font-size:24px">' + sp.pic + '</span>' +
+      '<div class="rowline"><span style="font-size:24px">' + icon(sp.ic) + '</span>' +
       '<div style="flex:1;min-width:0"><b style="font-size:14.5px">' +
         esc(a.name || spLabel(a.species)) + '</b>' +
       '<div class="en">' + (a.pashu_tag ? 'Tag ' + esc(a.pashu_tag) :
@@ -1436,7 +1450,7 @@ function paintAnimals(data) {
         rows.length + ' ' + esc(T('సందర్శనలు', 'visits')) + '</div></div>' +
       '<a class="btn small ghost" href="#new">' + esc(T('సలహా', 'Ask')) + '</a></div>' +
       visits +
-      '<details class="carebox"><summary>' + sp.pic + ' ' +
+      '<details class="carebox"><summary>' + icon(sp.ic) + ' ' +
         esc(T('ఈ పశువుకు సూచనలు', 'Care for this animal')) + '</summary>' +
         care + '</details>' +
       '</div>';
@@ -1484,7 +1498,7 @@ function paintCentre(data) {
   render('<h1>' + TL('మీ కేంద్రం', 'Your centre') + '</h1>' +
     facilityCard(f, '') +
     '<div class="card" style="background:var(--cta-50);box-shadow:none">' +
-      '<div class="rowline" style="align-items:flex-start"><span style="font-size:17px">ℹ️</span>' +
+      '<div class="rowline" style="align-items:flex-start"><span style="font-size:17px">' + icon('info') + '</span>' +
       '<div class="hint" style="flex:1"><b>' +
       esc(T('ఈ కేంద్రం మీకు ఎందుకు?', 'Why this centre?')) + '</b><br>' +
       esc(T('మీ గ్రామ పంచాయతీ ఈ కేంద్రానికి కేటాయించబడింది. డాక్టర్ను మీరు ఎంచుకోరు — ఆ రోజు డ్యూటీలో ఉన్నవారు మీ కేసు తీసుకుంటారు.',
@@ -1655,8 +1669,8 @@ function vVacc() {
               ' \u00b7 ' + esc(due) + '</span>'
             : '<span class="badge b-RESOLVED">' + esc(due) + '</span>';
       return '<div class="card"><div class="rowline">' +
-        '<span style="font-size:23px">' + esc((SPECIES.find(function (x) { return x.v === a.species; })
-          || { pic: '\ud83d\udc04' }).pic) + '</span>' +
+        '<span style="font-size:23px">' + icon((SPECIES.find(function (x) { return x.v === a.species; })
+          || { ic: 'cow' }).ic) + '</span>' +
         '<div style="flex:1;min-width:0"><b style="font-size:14px">' + esc(spLabel(a.species)) + '</b>' +
         '<div class="en">' + (a.tag ? 'Tag ' + esc(a.tag) : esc(T('\u0c1f\u0c4d\u0c2f\u0c3e\u0c17\u0c4d \u0c32\u0c47\u0c26\u0c41', 'No ear tag'))) + '</div></div>' +
         pill + '</div>' +
@@ -1689,33 +1703,33 @@ function vTips() {
       esc(T('జనగామ పశు వైద్య శాఖ సాధారణ సూచనలు. తీవ్రంగా అనారోగ్యంగా ఉంటే 1962కి కాల్ చేయండి.',
         'General guidance from the Jangaon Veterinary Department. If the animal is seriously ill, call 1962.')) + '</p>' +
 
-    '<div class="card"><h2>✅ ' + TL('చేయవలసినవి', 'Do') + '</h2>' +
-      row('💧', 'పశువులకు ఎప్పుడూ శుభ్రమైన తాగునీరు అందుబాటులో ఉంచండి',
+    '<div class="card"><h2>' + icon('check') + ' ' + TL('చేయవలసినవి', 'Do') + '</h2>' +
+      row(icon('drops'), 'పశువులకు ఎప్పుడూ శుభ్రమైన తాగునీరు అందుబాటులో ఉంచండి',
         'Keep clean drinking water available at all times') +
-      row('💉', 'ప్రభుత్వ టీకాలు సకాలంలో వేయించండి',
+      row(icon('syringe'), 'ప్రభుత్వ టీకాలు సకాలంలో వేయించండి',
         'Keep government vaccinations on schedule') +
-      row('🪱', 'సంవత్సరానికి కనీసం రెండుసార్లు నాగలి నివారణ మందు',
+      row(icon('worm'), 'సంవత్సరానికి కనీసం రెండుసార్లు నాగలి నివారణ మందు',
         'Deworm at least twice a year') +
-      row('🥛', 'పాలు పితికే ముందు, తర్వాత పొదుగును శుభ్రం చేయండి',
+      row(icon('milk'), 'పాలు పితికే ముందు, తర్వాత పొదుగును శుభ్రం చేయండి',
         'Clean the udder before and after milking') +
-      row('🏷️', 'చెవి ట్యాగ్ నంబర్ భద్రంగా నోట్ చేసుకోండి',
+      row(icon('tag'), 'చెవి ట్యాగ్ నంబర్ భద్రంగా నోట్ చేసుకోండి',
         'Keep the ear tag number noted safely') +
     '</div>' +
 
-    '<div class="card"><h2>⛔ ' + TL('చేయకూడనివి', "Don't") + '</h2>' +
-      row('💊', 'డాక్టర్ సూచన లేకుండా సొంతంగా యాంటీబయాటిక్స్ ఇవ్వవద్దు',
+    '<div class="card"><h2>' + icon('ban') + ' ' + TL('చేయకూడనివి', "Don't") + '</h2>' +
+      row(icon('pill'), 'డాక్టర్ సూచన లేకుండా సొంతంగా యాంటీబయాటిక్స్ ఇవ్వవద్దు',
         'Never give antibiotics without a vet’s advice', 1) +
-      row('🌾', 'పురుగుమందు చల్లిన పొలాల్లో వెంటనే మేపవద్దు',
+      row(icon('grain'), 'పురుగుమందు చల్లిన పొలాల్లో వెంటనే మేపవద్దు',
         'Do not graze on freshly sprayed fields', 1) +
-      row('🐄', 'ఈత కష్టమైనప్పుడు బలవంతంగా లాగవద్దు — 1962కి కాల్ చేయండి',
+      row(icon('cow'), 'ఈత కష్టమైనప్పుడు బలవంతంగా లాగవద్దు — 1962కి కాల్ చేయండి',
         'Never pull during a difficult calving — call 1962', 1) +
-      row('🚫', 'ప్లాస్టిక్ కవర్లు, పాడైన మేత పశువులకు అందకుండా చూడండి',
+      row(icon('ban'), 'ప్లాస్టిక్ కవర్లు, పాడైన మేత పశువులకు అందకుండా చూడండి',
         'Keep plastic and spoiled feed away from animals', 1) +
-      row('🐍', 'పాము కాటుకు నాటు వైద్యం మీద ఆధారపడవద్దు',
+      row(icon('snake'), 'పాము కాటుకు నాటు వైద్యం మీద ఆధారపడవద్దు',
         'Do not rely on home remedies for snakebite', 1) +
     '</div>' +
 
-    '<a class="sosbar" href="tel:1962"><span class="sb-ic">🚑</span>' +
+    '<a class="sosbar" href="tel:1962"><span class="sb-ic">' + icon('ambulance') + '</span>' +
       '<span><b>' + esc(T('అత్యవసరమా? 1962', 'Emergency? Call 1962')) + '</b>' +
       '<span class="hint">' + esc(T('24 గంటలూ ఉచిత', 'Free, 24 hours')) + '</span></span></a>');
 }
@@ -1743,10 +1757,10 @@ function vAttend() {
     var nextIn = !last || last.type === 'out';
     var rows = d.records.map(function (r) {
       var loc = (r.lat && r.lng)
-        ? ' <a target="_blank" rel="noopener" href="' + mapsLink(r.lat, r.lng) + '">📍</a>' +
+        ? ' <a target="_blank" rel="noopener" href="' + mapsLink(r.lat, r.lng) + '">' + icon('pin') + '</a>' +
           (r.dist_m !== '' && r.dist_m != null ? '<span class="hint"> ' + esc(String(r.dist_m)) + 'm</span>' : '') : '';
-      var ph = r.has_photo ? ' <a href="#" data-ph="' + esc(r.id) + '">📷</a>' : '';
-      return '<tr><td>' + (r.type === 'in' ? '✅ In' : '🏁 Out') + loc + ph +
+      var ph = r.has_photo ? ' <a href="#" data-ph="' + esc(r.id) + '">' + icon('camera') + '</a>' : '';
+      return '<tr><td>' + (r.type === 'in' ? icon('check') + ' In' : icon('flag') + ' Out') + loc + ph +
         '<div id="phbox-' + esc(r.id) + '"></div></td><td>' + esc(r.at) + '</td></tr>';
     }).join('') || '<tr><td colspan="2" class="hint">No records yet</td></tr>';
     render('<h1>Attendance</h1>' + staffNav('#att') +
@@ -1754,10 +1768,10 @@ function vAttend() {
       '<label style="text-align:left">Live photo — camera only, no gallery</label>' +
       '<video id="cam" class="cam" autoplay playsinline muted></video>' +
       '<div id="campv"></div>' +
-      '<div class="rowline" style="justify-content:center"><button class="btn small ghost" id="snap">📸 Capture</button></div>' +
+      '<div class="rowline" style="justify-content:center"><button class="btn small ghost" id="snap">Capture</button></div>' +
       '<p class="hint">Your location is captured automatically. Staff mapped to a centre must be within 300 m of it to mark attendance.</p>' +
       '<button class="btn ' + (nextIn ? 'green' : 'amber') + '" id="att" disabled>' +
-      (nextIn ? '✅ Check in' : '🏁 Check out') + '</button></div>' +
+      (nextIn ? 'Check in' : 'Check out') + '</button></div>' +
       '<div class="card"><h2>My recent records</h2><table>' + rows + '</table></div>');
     wireStaffNav();
     var camB64 = null;
@@ -1766,7 +1780,7 @@ function vAttend() {
       el('att').disabled = true;
       el('campv').innerHTML = '';
       el('cam').style.display = '';
-      el('snap').textContent = '📸 Capture';
+      el('snap').textContent = 'Capture';
       if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) {
         el('msg').innerHTML = '<div class="err">This browser has no live camera support — use Chrome</div>';
         return;
@@ -1798,7 +1812,7 @@ function vAttend() {
       stopCam();
       v.style.display = 'none';
       el('campv').innerHTML = '<img class="ph" style="max-width:200px" src="data:image/jpeg;base64,' + camB64 + '">';
-      el('snap').textContent = '🔄 Retake';
+      el('snap').textContent = 'Retake';
       el('msg').innerHTML = '';
       el('att').disabled = false;
     };
@@ -1812,11 +1826,11 @@ function vAttend() {
           lat: pos.coords.latitude.toFixed(6), lng: pos.coords.longitude.toFixed(6) })
         .then(vAttend).catch(function (e) {
           el('msg').innerHTML = '<div class="err">' + esc(e.message) + '</div>';
-          el('att').disabled = false; el('att').textContent = nextIn ? '✅ Check in' : '🏁 Check out';
+          el('att').disabled = false; el('att').textContent = nextIn ? 'Check in' : 'Check out';
         });
       }, function () {
         el('msg').innerHTML = '<div class="err">Could not get location — switch on GPS and try again</div>';
-        el('att').disabled = false; el('att').textContent = nextIn ? '✅ Check in' : '🏁 Check out';
+        el('att').disabled = false; el('att').textContent = nextIn ? 'Check in' : 'Check out';
       }, { enableHighAccuracy: true, timeout: 15000 });
     };
     Array.prototype.forEach.call(document.querySelectorAll('[data-ph]'), function (a) {
@@ -1988,7 +2002,9 @@ function vStaff(msg) {
   var nb = S.meta && S.meta.needsBootstrap;
   render(
     '<div class="signin">' +
-      '<div class="si-mark"><img src="icon-192.png" alt=""></div>' +
+      '<div class="si-mark"><img src="img/emblem-telangana.png" width="58" height="58" alt="">' +
+        '<span class="crest-rule"></span>' +
+        '<img src="img/dept-animal-husbandry.png" width="58" height="58" alt=""></div>' +
       '<h1>Staff sign-in</h1>' +
       '<p class="si-sub">Veterinary &amp; Animal Husbandry Dept, Jangaon</p>' +
     '</div>' +
@@ -2074,7 +2090,8 @@ function vVet(tab) {
         '<div class="rowline" style="margin-top:8px"><input id="regno" placeholder="TSVC/2019/4471" maxlength="40" style="margin:0">' +
         '<button class="btn small" id="regsave">Save</button></div></div>') +
       '<div class="rowline"><button class="btn small ' + (q.on_call ? 'green' : 'amber') + '" id="avbtn">' +
-      (q.on_call ? '🟢 On call — tap to go off' : '🟠 Off call — tap to go on') + '</button></div>' +
+      (q.on_call ? '<span class="dot green"></span> On call — tap to go off'
+                 : '<span class="dot amber"></span> Off call — tap to go on') + '</button></div>' +
       '<p class="hint">' + (q.jurisdiction && q.jurisdiction.length
         ? 'Your centres: <b>' + esc(q.jurisdiction.join(', ')) + '</b> — you see cases routed to them (and unrouted ones).'
         : (S.user.role === 'admin' ? 'District-wide view.' : 'District-wide view (this account is not mapped to a centre in the staff master).')) +
@@ -2130,10 +2147,10 @@ function vAdmin() {
     var quick = '<div class="card"><h2>Quick links</h2>' +
       '<p class="hint">Google links open as <b>' + esc(S.user.email) + '</b> even if other accounts are signed in.</p>' +
       '<div class="rowline">' +
-      (lk.spreadsheet_id ? '<a class="btn small ghost" target="_blank" rel="noopener" href="https://docs.google.com/spreadsheets/d/' + esc(lk.spreadsheet_id) + '/edit' + au + '">📊 Database Sheet</a>' : '') +
-      (lk.photos_folder_id ? '<a class="btn small ghost" target="_blank" rel="noopener" href="https://drive.google.com/drive/folders/' + esc(lk.photos_folder_id) + au + '">🖼️ Photos folder</a>' : '') +
-      '<a class="btn small ghost" target="_blank" rel="noopener" href="poster.html">🪧 QR poster</a>' +
-      '<a class="btn small ghost" target="_blank" rel="noopener" href="https://github.com/jangaoncdm/jps-app">🛠️ App repo</a>' +
+      (lk.spreadsheet_id ? '<a class="btn small ghost" target="_blank" rel="noopener" href="https://docs.google.com/spreadsheets/d/' + esc(lk.spreadsheet_id) + '/edit' + au + '">' + icon('chart') + ' Database Sheet</a>' : '') +
+      (lk.photos_folder_id ? '<a class="btn small ghost" target="_blank" rel="noopener" href="https://drive.google.com/drive/folders/' + esc(lk.photos_folder_id) + au + '">' + icon('image') + ' Photos folder</a>' : '') +
+      '<a class="btn small ghost" target="_blank" rel="noopener" href="poster.html">' + icon('poster') + ' QR poster</a>' +
+      '<a class="btn small ghost" target="_blank" rel="noopener" href="https://github.com/jangaoncdm/jps-app">' + icon('tools') + ' App repo</a>' +
       '</div></div>';
     var mrows = Object.keys(st.byMandal).sort(function (a, b) { return st.byMandal[b] - st.byMandal[a]; })
       .map(function (m) { return '<tr><td>' + esc(m) + '</td><td>' + esc(st.byMandal[m]) + '</td></tr>'; }).join('') ||
@@ -2180,7 +2197,7 @@ function vAdmin() {
       // Staff the master maps to no centre: district-wide case access, and attendance that
       // cannot be geo-fenced because there is no centre to measure against.
       (st.unmapped_staff && st.unmapped_staff.length
-        ? '<div class="card"><h2>⚠️ Staff master incomplete</h2>' +
+        ? '<div class="card"><h2>' + icon('warn') + ' Staff master incomplete</h2>' +
           '<p><b>' + esc(st.unmapped_staff.length) + '</b> staff rows are mapped to no centre. ' +
           'Those accounts see every case in the district and their attendance cannot be ' +
           'geo-fenced. Fill the facility column in the staff master to close this.</p>' +
@@ -2232,21 +2249,22 @@ function paintTabs() {
   document.body.className = farmer ? '' : 'staff';
   if (!farmer) return;
   var h = location.hash || '#home';
-  var tab = function (href, icon, te, en, cls) {
+  var tab = function (href, glyph, te, en, cls) {
     var on = (href === '#home' && (h === '#home' || h === ''))
       || (href !== '#home' && h.indexOf(href) === 0);
     // one word per tab, never bilingual: five 'Telugu · English' labels
     // do not fit a phone and collide with each other.
     return '<a href="' + href + '" class="' + (cls || '') + (on ? ' on' : '') + '">' +
-      '<span class="ic">' + icon + '</span><span class="tx">' +
+      '<span class="ic">' + glyph + '</span><span class="tx">' +
       esc(S.lang === 'en' ? en : te) + '</span></a>';
   };
   bar.innerHTML =
-    tab('#home', '🏠', '\u0c39\u0c4b\u0c2e\u0c4d', 'Home') +
-    tab('#cases', '📋', '\u0c15\u0c47\u0c38\u0c41\u0c32\u0c41', 'Cases') +
-    tab('#new', '➕', '\u0c05\u0c21\u0c17\u0c02\u0c21\u0c3f', 'Ask') +
-    tab('#animals', '🐄', '\u0c2a\u0c36\u0c41\u0c35\u0c41\u0c32\u0c41', 'Animals') +
-    '<a href="tel:1962" class="sos"><span class="ic">🚑</span><span class="tx">1962</span></a>';
+    tab('#home', icon('home'), '\u0c39\u0c4b\u0c2e\u0c4d', 'Home') +
+    tab('#cases', icon('cases'), '\u0c15\u0c47\u0c38\u0c41\u0c32\u0c41', 'Cases') +
+    tab('#new', icon('plus'), '\u0c05\u0c21\u0c17\u0c02\u0c21\u0c3f', 'Ask') +
+    tab('#animals', icon('cow'), '\u0c2a\u0c36\u0c41\u0c35\u0c41\u0c32\u0c41', 'Animals') +
+    '<a href="tel:1962" class="sos"><span class="ic">' + icon('ambulance') +
+      '</span><span class="tx">1962</span></a>';
 }
 
 /** A staff screen could not load. Only a dead session is a reason to sign out: a farmer
