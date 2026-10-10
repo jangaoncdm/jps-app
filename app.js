@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.7.0-M6 b010
+/* JPS app.js — BUILD JPS v0.7.1-M6 b011
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.7.0-M6 b010';
+var BUILD = 'JPS v0.7.1-M6 b011';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', pic:'🐄' }, { v:'buffalo', te:'గేదె', en:'Buffalo', pic:'🐃' },
@@ -70,7 +70,13 @@ var S = {
   // Responses already fetched this session. A screen paints from here at once and
   // refreshes behind the user; the cache is dropped whenever the backend rev moves,
   // so it can never show something the server has since changed.
-  cache: {}, cacheRev: 0, inflight: 0
+  cache: {}, cacheRev: 0, inflight: 0,
+  // Set by any typing or file pick inside #view, cleared by render(). A poll re-renders a
+  // whole screen, so it has to stand down while the user is part-way through something.
+  dirty: 0,
+  // Bumped by route(). An api() reply that arrives after the user has navigated away
+  // belongs to a screen that no longer exists and must not paint.
+  nav: 0
 };
 
 /** Read-through cache for GET-shaped calls. Paints now, refreshes after. */
@@ -78,9 +84,19 @@ function cached(key, fn) {
   if (S.cacheRev !== S.lastRev) { S.cache = {}; S.cacheRev = S.lastRev; }
   return S.cache[key] || null;
 }
-function cacheSet(key, val) { S.cache[key] = val; return val; }
+function cacheSet(key, val) {
+  // Stamp the rev this value was read at. Without it S.cacheRev stayed 0 while the first
+  // response raised S.lastRev, so everything written on a screen's first visit was thrown
+  // away on the second and the cache only ever started helping on the third.
+  if (S.cacheRev !== S.lastRev) { S.cache = {}; S.cacheRev = S.lastRev; }
+  S.cache[key] = val; return val;
+}
 function cacheDrop() { S.cache = {}; }
 function saveAuth(token, user) {
+  // logout() drops the cache but signing in did not, and no sign-in handler bumps the
+  // backend rev -- so on a shared office phone the previous user's home screen, cases and
+  // profile survived the identity change and could still be painted from memory.
+  cacheDrop();
   S.token = token; S.user = user;
   localStorage.setItem('jps_token', token);
   localStorage.setItem('jps_user', JSON.stringify(user));
@@ -88,6 +104,7 @@ function saveAuth(token, user) {
 function logout() {
   cacheDrop();
   localStorage.removeItem('jps_token'); localStorage.removeItem('jps_user');
+  localStorage.removeItem('jps_staff_email');   // shared phone: don't leave the last name up
   S.token = ''; S.user = null; location.hash = '#identify';
 }
 
@@ -134,8 +151,20 @@ function api(action, payload, _retry) {
   if (!_retry) progress(true);
   var settle = function (v) { if (!_retry) progress(false); return v; };
   var reject = function (e) { if (!_retry) progress(false); throw e; };
-  return fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ action: action, payload: payload }) })
+  var body = JSON.stringify({ action: action, payload: payload });
+  // A village tower that accepts the connection but never completes it used to leave the
+  // screen on its spinner indefinitely, with no message and nothing to retry. A photo
+  // upload gets plenty of room; everything else answers inside 30 s or it has failed.
+  var timeout = new Promise(function (_, rej) {
+    setTimeout(function () {
+      var te = new Error(T('నెట్‌వర్క్ స్లోగా ఉంది — మళ్లీ ప్రయత్నించండి',
+                           'The network did not answer — please try again'));
+      te.code = 'timeout';
+      rej(te);
+    }, body.length > 20000 ? 90000 : 30000);
+  });
+  var net = fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: body })
     .then(function (r) { return r.text(); })
     .then(function (txt) {
       // Right after a backend deploy Apps Script serves a warm-up HTML page instead of
@@ -143,12 +172,14 @@ function api(action, payload, _retry) {
       // farmer's screen into a half-second pause.
       try { return JSON.parse(txt); }
       catch (e) {
-        if (_retry) throw new Error('Server is waking up. Please try again in a moment.');
+        if (_retry) throw new Error(T('సర్వర్ మేల్కొంటోంది — కొద్ది క్షణాల్లో మళ్లీ ప్రయత్నించండి',
+                                     'The server is waking up — try again in a moment'));
         return new Promise(function (res) { setTimeout(res, 1200); })
           .then(function () { return api(action, payload, 1); })
           .then(function (d) { return { ok: true, data: d, rev: S.lastRev, _done: 1 }; });
       }
-    })
+    });
+  return Promise.race([net, timeout])
     .then(function (j) {
       if (j._done) return settle(j.data);
       if (j.rev) S.lastRev = j.rev;
@@ -156,6 +187,17 @@ function api(action, payload, _retry) {
       return settle(j.data);
     }, reject);
 }
+/** api() for a screen. If the user navigates before the reply lands, the promise simply
+ *  never settles, so a slow 2G response cannot paint over the screen they are on now --
+ *  which is how a filled-in request form with a photo attached used to vanish. */
+function vapi(action, payload) {
+  var nav = S.nav;
+  var stale = function () { return new Promise(function () {}); };
+  return api(action, payload).then(
+    function (d) { return S.nav === nav ? d : stale(); },
+    function (e) { if (S.nav !== nav) return stale(); throw e; });
+}
+
 function loadMasters() {
   if (S.masters) return Promise.resolve(S.masters);
   return api('meta.masters', {}).then(function (m) { S.masters = m; return m; });
@@ -203,11 +245,21 @@ function loading(n) { render(skeleton(n)); }
    to strand it halfway up the page. Every render replays the page-enter motion. */
 function render(html) {
   var v = el('view');
+  S.dirty = 0;                 // a fresh screen holds nothing the user has typed yet
   v.innerHTML = html;
   v.classList.remove('swap');
   void v.offsetWidth;          // restart the animation on a same-named class
   v.classList.add('swap');
 }
+// Capture phase and document level, so this survives every innerHTML swap. 'change' is
+// here for file inputs and selects, which older WebViews do not fire 'input' for.
+['input', 'change'].forEach(function (ev) {
+  document.addEventListener(ev, function (e) {
+    var v = el('view');
+    if (v && v.contains(e.target)) S.dirty = 1;
+  }, true);
+});
+
 function badge(st) {
   return '<span class="badge b-' + esc(st) + '">' + esc(T(STATUS_TE[st] || st, STATUS_EN[st] || st)) + '</span>';
 }
@@ -354,12 +406,23 @@ function autoCarousel() {
 }
 
 function stopPoll() { if (S.poll) { clearInterval(S.poll); S.poll = null; } }
+/** True while the screen holds something a repaint would destroy: text the user has typed
+ *  (S.dirty), or a one-time secret the markup flagged with data-keep. */
+function viewHoldsUserWork() {
+  if (S.dirty) return true;
+  var v = el('view');
+  return !!(v && v.querySelector('[data-keep]'));
+}
+
 function startPoll(reloadFn) {
   stopPoll();
   var seen = S.lastRev;
   S.poll = setInterval(function () {
     api('meta.rev', {}).then(function () {
-      if (S.lastRev !== seen) { seen = S.lastRev; reloadFn(); }
+      // `seen` is deliberately left alone while the screen is dirty, so the repaint
+      // happens as soon as the form is submitted or the user moves on -- rather than
+      // wiping a half-written diagnosis because someone else in the district filed a case.
+      if (S.lastRev !== seen && !viewHoldsUserWork()) { seen = S.lastRev; reloadFn(); }
     }).catch(function () {});
   }, 25000);
 }
@@ -536,9 +599,9 @@ function vHome() {
   var hit = cached('home');
   if (hit) paintHome(hit); else loading(3);
   Promise.all([
-    api('farmer.profile', {}),
-    api('farmer.myRequests', {}),
-    api('meta.broadcasts', {}).catch(function () { return { broadcasts: [] }; })
+    vapi('farmer.profile', {}),
+    vapi('farmer.myRequests', {}),
+    vapi('meta.broadcasts', {}).catch(function () { return { broadcasts: [] }; })
   ]).then(function (parts) {
     var data = { profile: parts[0], reqs: parts[1], bc: parts[2] };
     // keep the locally held user in step with the profile the server returns
@@ -693,6 +756,11 @@ function paintHome(data) {
     '</div>');
   autoCarousel();
   el('lo').onclick = function (ev) { ev.preventDefault(); logout(); };
+  // The home screen carries the live status of the user's own cases, so it should follow
+  // the backend like every other screen. It had no poll at all: a farmer sitting here saw
+  // nothing change until they navigated away and back. The dirty guard in startPoll keeps
+  // it from redrawing over anything being typed.
+  startPoll(function () { vHome(); });
 }
 /* #1: asked once, reused everywhere. The vet sees this as case context, which is
    why the chronic box exists at all - it is the thing an owner would otherwise
@@ -700,7 +768,7 @@ function paintHome(data) {
 function vProfile() {
   var hit = cached('profile');
   if (hit) paintProfile(hit); else loading(3);
-  Promise.all([api('farmer.profile', {}), loadMasters(), api('meta.info', {})])
+  Promise.all([vapi('farmer.profile', {}), loadMasters(), vapi('meta.info', {})])
     .then(function (parts) {
       var data = { prof: parts[0], gps: parts[1].gpsByMandal || {},
                    mandals: (S.meta && S.meta.mandals) || parts[2].mandals || [] };
@@ -833,9 +901,11 @@ function paintProfile(data) {
 
 function vNew(want) {
   loading(3);
-  Promise.all([loadMasters(), api('farmer.profile', {}).catch(function () { return {}; })])
+  Promise.all([loadMasters(), vapi('farmer.profile', {}).catch(function () { return {}; }),
+               vapi('meta.info', {}).catch(function () { return {}; })])
   .then(function (parts) {
     var M = parts[0], prof = parts[1] || {}, u = prof.user || S.user || {};
+    if (!S.meta && parts[2] && parts[2].mandals) S.meta = parts[2];
     // #9: one media box per tile, so a photo and an emoji fallback leave the caption
     // on the same baseline right across the grid.
     var tiles = SPECIES.map(function (sp) {
@@ -866,13 +936,15 @@ function vNew(want) {
       return '<optgroup label="' + esc(c) + '">' + inner + '</optgroup>';
     }).join('');
 
-    var mandals = (S.meta ? S.meta.mandals : []) || [];
+    // vProfile and vLoc both fall back to meta.info; without it a #new reached while the
+    // boot call was still in flight had an empty Mandal list and only a reload could fix it.
+    var mandals = (S.meta && S.meta.mandals) || (parts[2] && parts[2].mandals) || [];
     var mName = (mandals.find(function (m) { return String(m.id) === String(u.mandal_id); }) || {}).name || '';
     // #1: when the profile already answers these, show them as one line with a
     // Change link instead of re-asking for mandal / GP / village / name.
     var known = !!(u.mandal_id && (u.gp || u.village) && u.name);
     var md = mandals.map(function (m) {
-      return '<option value="' + m.id + '"' + (String(u.mandal_id) === String(m.id) ? ' selected' : '') +
+      return '<option value="' + esc(m.id) + '"' + (String(u.mandal_id) === String(m.id) ? ' selected' : '') +
         '>' + esc(m.name) + '</option>';
     }).join('');
 
@@ -1014,7 +1086,7 @@ function vNew(want) {
 function vTicket(ticket) {
   loading(3);
   var staff = S.user && S.user.role !== 'farmer';
-  api('request.get', { ticket: ticket }).then(function (r) {
+  vapi('request.get', { ticket: ticket }).then(function (r) {
     var events = (r.events || []).map(function (e) {
       return '<li><b>' + esc(EVENT_TE[e.type] || e.type) + '</b>' +
         (e.actor ? ' — ' + esc(e.actor) : '') +
@@ -1029,7 +1101,7 @@ function vTicket(ticket) {
     var op = staff && r.owner_profile ? r.owner_profile : null;
     var ownerBox = op && (op.count || op.chronic)
       ? '<div class="ownerbox"><b>Owner profile</b>' +
-          (op.count ? '🐄 ' + esc(op.herd) + ' (' + op.count + ')' : '') +
+          (op.count ? '🐄 ' + esc(op.herd) + ' (' + esc(op.count) + ')' : '') +
           (op.gp ? '<div class="en">' + esc(op.gp) + (op.village && op.village !== op.gp ? ', ' + esc(op.village) : '') + '</div>' : '') +
           (op.chronic ? '<div class="chronic"><b>Long-running</b>' + esc(op.chronic) + '</div>' : '') +
         '</div>'
@@ -1038,7 +1110,7 @@ function vTicket(ticket) {
       ? '<p><a target="_blank" rel="noopener" href="' + mapsLink(r.farm_lat, r.farm_lng) + '">🗺️ User location on map</a></p>' : '';
     var visit = r.visit_date
       ? '<p>📅 ' + esc(T('సందర్శన', 'Visit')) + ': <b>' + esc(r.visit_date) + (r.visit_slot ? ' — ' + esc(r.visit_slot) : '') + '</b></p>' : '';
-    var photo = r.photo ? '<p><img class="ph" src="data:' + esc(r.photo.mime) + ';base64,' + r.photo.b64 + '"></p>' : '';
+    var photo = r.photo ? '<p><img class="ph" src="data:' + esc(r.photo.mime) + ';base64,' + esc(r.photo.b64) + '"></p>' : '';
     var report = r.diagnosis
       ? '<div class="card"><h2>🩺 ' + TL('డాక్టర్ నివేదిక', "Doctor's report") + '</h2>' +
         '<p>' + esc(r.diagnosis) + '</p>' +
@@ -1077,7 +1149,7 @@ function vTicket(ticket) {
                 (m.note ? '<div class="rxsub">' + esc(m.note) + '</div>' : '') + '</td>' +
               '<td><b class="rxfreq">' + esc(m.freq) + '</b>' +
                 (fq ? '<div class="rxsub">' + esc(T(fq.te, fq.en)) + '</div>' : '') +
-                (m.days ? '<div class="rxsub">' + m.days + ' ' + esc(T('రోజులు', 'days')) + '</div>' : '') +
+                (m.days ? '<div class="rxsub">' + esc(m.days) + ' ' + esc(T('రోజులు', 'days')) + '</div>' : '') +
                 (tm && m.timing !== 'any' ? '<div class="rxsub">' + esc(T(tm.te, tm.en)) + '</div>' : '') +
               '</td></tr>';
           }).join('') + '</tbody></table>'
@@ -1087,14 +1159,23 @@ function vTicket(ticket) {
       var wd = '';
       if (p.withdraw_milk_h || p.withdraw_meat_d) {
         var parts = [];
-        if (p.withdraw_milk_h) parts.push('<div><span class="wdno">' + p.withdraw_milk_h + ' ' +
+        if (p.withdraw_milk_h) parts.push('<div><span class="wdno">' + esc(p.withdraw_milk_h) + ' ' +
           esc(T('గంటలు', 'hours')) + '</span>' + esc(T('పాలు వాడవద్దు / అమ్మవద్దు', 'Do not use or sell milk')) + '</div>');
-        if (p.withdraw_meat_d) parts.push('<div><span class="wdno">' + p.withdraw_meat_d + ' ' +
+        if (p.withdraw_meat_d) parts.push('<div><span class="wdno">' + esc(p.withdraw_meat_d) + ' ' +
           esc(T('రోజులు', 'days')) + '</span>' + esc(T('మాంసానికి పంపవద్దు', 'Do not send for meat')) + '</div>');
         wd = '<div class="rxwd"><div class="wdttl">⚠️ ' +
           esc(T('ఔషధ విరమణ కాలం', 'Withdrawal period')) + '</div>' + parts.join('') +
           '<div class="wdfoot">' + esc(T('చివరి మోతాదు నుంచి లెక్కించండి',
             'Counted from the last dose given')) + '</div></div>';
+      } else if ((p.meds || []).length && (p.meds || []).every(function (m) { return m.wd_none; })) {
+        // cleanMed promises that "the doctor declared none is needed" can never be read as
+        // "nobody answered" — but both printed an empty slip, which is the one reading that
+        // matters for milk. Say it explicitly. wd_none rides along in meds_json already.
+        wd = '<div class="rxwd ok"><div class="wdttl">✅ ' +
+          esc(T('ఔషధ విరమణ కాలం', 'Withdrawal period')) + '</div>' +
+          '<div>' + esc(T('ఈ మందులకు పాలు / మాంసం ఆపాల్సిన అవసరం లేదు — డాక్టర్ నిర్ధారించారు',
+            'No milk or meat withholding needed for these medicines — confirmed by the doctor')) +
+          '</div></div>';
       }
 
       var body = ptBlock +
@@ -1104,7 +1185,7 @@ function vTicket(ticket) {
         (p.advice ? '<div class="rxsec"><h3>' + esc(T('సలహా', 'Advice')) + '</h3><p>' + esc(p.advice) + '</p></div>' : '') +
         (p.tests ? '<div class="rxsec"><h3>' + esc(T('పరీక్షలు', 'Tests')) + '</h3><p>' + esc(p.tests) + '</p></div>' : '') +
         (p.followup_date ? '<div class="rxsec"><h3>' + esc(T('మళ్లీ చూపించండి', 'Follow-up')) + '</h3><p>' + esc(p.followup_date) + '</p></div>' : '') +
-        (p.photo ? '<img class="ph" src="data:' + esc(p.photo.mime) + ';base64,' + p.photo.b64 + '">' : '');
+        (p.photo ? '<img class="ph" src="data:' + esc(p.photo.mime) + ';base64,' + esc(p.photo.b64) + '">' : '');
 
       var foot = '<div class="rxfoot">' +
         '<div>' + esc(T('డిజిటల్‌గా జారీ చేయబడింది — సంతకం అవసరం లేదు',
@@ -1187,7 +1268,8 @@ function vTicket(ticket) {
       '<p><b>' + esc(spLabel(r.species)) + '</b> — ' + esc(syLabel(r.symptom)) + '</p>' + svcLine +
       '<p class="hint">' + esc(r.gp ? r.gp + ', ' : '') + esc(r.village) + ', ' + esc(r.mandal) + '</p>' +
       (r.description ? '<p>' + esc(r.description) + '</p>' : '') +
-      (r.pashu_tag ? '<p class="hint">Ear tag: ' + esc(r.pashu_tag) + '</p>' : '') +
+      (r.pashu_tag ? '<p class="hint">' + esc(T('చెవి ట్యాగ్', 'Ear tag')) +
+        ': ' + esc(r.pashu_tag) + '</p>' : '') +
       visit + farmer + ownerBox + farmLoc + vet + photo + '</div>' + video +
       (!staff ? facilityCard(r.facility, T('మీ పశు వైద్య కేంద్రం', 'Your veterinary centre')) : '') +
       report + rx + actions +
@@ -1249,7 +1331,7 @@ function vTicket(ticket) {
 function vCases(filter) {
   filter = filter || 'all';
   loading(3);
-  api('farmer.myRequests', {}).then(function (d) {
+  vapi('farmer.myRequests', {}).then(function (d) {
     var open = ['NEW', 'ASSIGNED', 'VISIT_SCHEDULED'];
     var list = d.requests.filter(function (r) {
       if (filter === 'open') return open.indexOf(r.status) >= 0;
@@ -1288,7 +1370,7 @@ function vCases(filter) {
 function vAnimals() {
   var hit = cached('animals');
   if (hit) paintAnimals(hit); else loading(2);
-  Promise.all([api('farmer.profile', {}), api('farmer.myRequests', {})])
+  Promise.all([vapi('farmer.profile', {}), vapi('farmer.myRequests', {})])
     .then(function (parts) {
       var data = { prof: parts[0], reqs: parts[1] };
       cacheSet('animals', data);
@@ -1374,7 +1456,7 @@ function paintAnimals(data) {
 function vCentre() {
   var hit = cached('centre');
   if (hit) paintCentre(hit); else loading(3);
-  Promise.all([api('farmer.profile', {}), api('farmer.myRequests', {})])
+  Promise.all([vapi('farmer.profile', {}), vapi('farmer.myRequests', {})])
     .then(function (parts) {
       var data = { prof: parts[0], reqs: parts[1] };
       cacheSet('centre', data);
@@ -1413,7 +1495,7 @@ function paintCentre(data) {
 function vLoc(mode) {
   mode = mode || 'auto';
   loading(2);
-  Promise.all([loadMasters(), api('meta.info', {})]).then(function (both) {
+  Promise.all([loadMasters(), vapi('meta.info', {})]).then(function (both) {
     var gps = both[0].gpsByMandal || {};
     var mandals = (S.meta && S.meta.mandals) || both[1].mandals || [];
     var cur = S.user || {};
@@ -1490,10 +1572,12 @@ function vLoc(mode) {
       el('locgo').onclick = function () {
         var b = el('locgo');
         b.classList.add('busy');
+        if (!el('locout')) return;   // the user left while the GPS fix was still coming
         el('locout').innerHTML = '<div class="sk" style="width:70%;margin:0 auto"></div>';
         var done = function (fac) {
           b.classList.remove('busy');
           b.hidden = true;
+          if (!el('locout')) return;
           el('locout').innerHTML =
             '<div class="locfound"><div class="rowline"><span style="font-size:17px">\u2705</span>' +
             '<div style="flex:1;min-width:0"><b>' + esc(fac ? fac.name : T('\u0c26\u0c17\u0c4d\u0c17\u0c30\u0c3f \u0c15\u0c47\u0c02\u0c26\u0c4d\u0c30\u0c02', 'Nearest centre')) + '</b>' +
@@ -1527,8 +1611,14 @@ function vLoc(mode) {
    in the backend, so this reads the user's own history rather than inventing dates. */
 function vVacc() {
   loading(2);
-  api('farmer.myRequests', {}).then(function (d) {
-    var today = new Date().toISOString().slice(0, 10);
+  vapi('farmer.myRequests', {}).then(function (d) {
+    // IST, not UTC. toISOString() is UTC, so between midnight and 05:30 India time an
+    // overdue vaccination still read as fine.
+    var today = new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
+    var addDays = function (iso, n) {
+      var t = new Date(String(iso).slice(0, 10) + 'T00:00:00Z').getTime() + n * 86400000;
+      return new Date(t).toISOString().slice(0, 10);
+    };
     var addMonths = function (iso, n) {
       var q = String(iso).slice(0, 10).split('-');
       var y = Number(q[0]), mo = Number(q[1]) - 1 + n, dd = Number(q[2]);
@@ -1551,12 +1641,19 @@ function vVacc() {
     });
     var cards = order.map(function (k) {
       var a = by[k], due = a.last ? addMonths(a.last, 6) : null;
-      var state = !a.last ? 'none' : (today > due ? 'overdue' : 'ok');
+      // Three states, matching vaccStatus in Domain.gs. 'due' is the month's notice before
+      // the date; without it the owner saw a plain green badge until the day it lapsed.
+      var state = !a.last ? 'none'
+        : (today > due ? 'overdue' : (today >= addDays(due, -30) ? 'due' : 'ok'));
       var pill = state === 'none'
         ? '<span class="badge b-NEW">' + esc(T('\u0c30\u0c3f\u0c15\u0c3e\u0c30\u0c4d\u0c21\u0c41 \u0c32\u0c47\u0c26\u0c41', 'No record')) + '</span>'
         : state === 'overdue'
           ? '<span class="badge b-ESCALATED">' + esc(T('\u0c06\u0c32\u0c38\u0c4d\u0c2f\u0c02', 'Overdue')) + '</span>'
-          : '<span class="badge b-RESOLVED">' + esc(due) + '</span>';
+          : state === 'due'
+            ? '<span class="badge b-ASSIGNED">' +
+              esc(T('\u0c07\u0c2a\u0c4d\u0c2a\u0c41\u0c21\u0c41 \u0c38\u0c2e\u0c2f\u0c02', 'Due now')) +
+              ' \u00b7 ' + esc(due) + '</span>'
+            : '<span class="badge b-RESOLVED">' + esc(due) + '</span>';
       return '<div class="card"><div class="rowline">' +
         '<span style="font-size:23px">' + esc((SPECIES.find(function (x) { return x.v === a.species; })
           || { pic: '\ud83d\udc04' }).pic) + '</span>' +
@@ -1641,7 +1738,7 @@ function wireStaffNav() {
 
 function vAttend() {
   loading(2);
-  api('staff.attendance', {}).then(function (d) {
+  vapi('staff.attendance', {}).then(function (d) {
     var last = d.records[0];
     var nextIn = !last || last.type === 'out';
     var rows = d.records.map(function (r) {
@@ -1675,8 +1772,18 @@ function vAttend() {
         return;
       }
       navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
-        .then(function (st) { camStream = st; el('cam').srcObject = st; })
-        .catch(function () { el('msg').innerHTML = '<div class="err">Allow camera access to mark attendance</div>'; });
+        .then(function (st) {
+          // The Android permission dialog can outlive this screen. route() already called
+          // stopCam() on the way out, so a stream granted afterwards had nothing holding
+          // it and stayed live -- recording light on -- for the rest of the session.
+          var v = el('cam');
+          if (!v) { st.getTracks().forEach(function (t) { t.stop(); }); return; }
+          camStream = st; v.srcObject = st;
+        })
+        .catch(function () {
+          var m = el('msg');
+          if (m) m.innerHTML = '<div class="err">Allow camera access to mark attendance</div>';
+        });
     }
     startCam();
     el('snap').onclick = function () {
@@ -1716,18 +1823,20 @@ function vAttend() {
       a.onclick = function (ev) {
         ev.preventDefault();
         api('staff.attendPhoto', { id: a.getAttribute('data-ph') }).then(function (d2) {
-          el('phbox-' + a.getAttribute('data-ph')).innerHTML =
-            '<img class="ph" style="max-width:140px" src="data:' + esc(d2.photo.mime) + ';base64,' + d2.photo.b64 + '">';
+          var box = el('phbox-' + a.getAttribute('data-ph'));
+          if (!box) return;
+          box.innerHTML =
+            '<img class="ph" style="max-width:140px" src="data:' + esc(d2.photo.mime) + ';base64,' + esc(d2.photo.b64) + '">';
         }).catch(function (e) { alert(e.message); });
       };
     });
-  }).catch(function (e) { if (e.code === 'auth' || e.code === 'forbidden') return logout(); render('<div class="err">' + esc(e.message) + '</div>'); });
+  }).catch(staffErr);
 }
 
 function vLeave() {
   loading(2);
   var isAdmin = S.user.role === 'admin';
-  Promise.all([api('staff.leaveList', {}), isAdmin ? api('staff.leaveList', { all: 1 }) : Promise.resolve(null)])
+  Promise.all([vapi('staff.leaveList', {}), isAdmin ? vapi('staff.leaveList', { all: 1 }) : Promise.resolve(null)])
   .then(function (res) {
     var mine = res[0].leaves.map(function (l) {
       return '<tr><td>' + esc(l.from_date) + ' → ' + esc(l.to_date) + '<br><span class="hint">' + esc(l.reason) + '</span></td>' +
@@ -1754,7 +1863,7 @@ function vLeave() {
       '<div class="card"><h2>My requests</h2><table>' + mine + '</table></div>');
     wireStaffNav();
     el('lgo').onclick = function () {
-      api('staff.leaveRequest', { from_date: el('lf').value, to_date: el('lt').value, reason: el('lr').value })
+      busy(el('lgo'), api('staff.leaveRequest', { from_date: el('lf').value, to_date: el('lt').value, reason: el('lr').value }))
         .then(vLeave).catch(function (e) { el('msg').innerHTML = '<div class="err">' + esc(e.message) + '</div>'; });
     };
     Array.prototype.forEach.call(document.querySelectorAll('[data-lv]'), function (b) {
@@ -1763,7 +1872,7 @@ function vLeave() {
           .then(vLeave).catch(function (e) { alert(e.message); });
       };
     });
-  }).catch(function (e) { if (e.code === 'auth' || e.code === 'forbidden') return logout(); render('<div class="err">' + esc(e.message) + '</div>'); });
+  }).catch(staffErr);
 }
 
 function vStock() {
@@ -1780,8 +1889,8 @@ function vStock() {
         return '<tr class="' + (s.low ? 'breach' : '') + '"><td>' + esc(s.item_name) +
           (s.low ? ' <span class="badge b-ESCALATED">LOW</span>' : '') +
           '<br><span class="hint">' + esc(s.item_code) + '</span></td>' +
-          '<td><input style="width:70px" type="number" min="0" id="q-' + esc(s.item_code) + '" value="' + s.qty + '"></td>' +
-          '<td><input style="width:70px" type="number" min="0" id="r-' + esc(s.item_code) + '" value="' + s.reorder_level + '"></td>' +
+          '<td><input style="width:70px" type="number" min="0" id="q-' + esc(s.item_code) + '" value="' + esc(s.qty) + '"></td>' +
+          '<td><input style="width:70px" type="number" min="0" id="r-' + esc(s.item_code) + '" value="' + esc(s.reorder_level) + '"></td>' +
           '<td><button class="btn small ghost" data-save="' + esc(s.item_code) + '">Save</button></td></tr>';
       }).join('') || '<tr><td colspan="4" class="hint">No items tracked here yet — add one below</td></tr>';
       var addOpts = M.stockItems.filter(function (i) { return !have[i.code]; }).map(function (i) {
@@ -1807,13 +1916,13 @@ function vStock() {
       });
       el('nadd').onclick = function () { save(el('ni').value, el('nq').value, el('nr').value); };
     });
-  }).catch(function (e) { if (e.code === 'auth' || e.code === 'forbidden') return logout(); render('<div class="err">' + esc(e.message) + '</div>'); });
+  }).catch(staffErr);
 }
 
 function vIssues() {
   loading(2);
   var isAdmin = S.user.role === 'admin';
-  api('staff.issueList', {}).then(function (d) {
+  vapi('staff.issueList', {}).then(function (d) {
     var rows = d.issues.map(function (i) {
       var act = (isAdmin && i.status === 'open')
         ? '<div class="rowline"><input id="ir-' + esc(i.id) + '" type="text" placeholder="Response">' +
@@ -1832,7 +1941,7 @@ function vIssues() {
       '<div class="card"><h2>' + (isAdmin ? 'All issues' : 'My issues') + '</h2>' + rows + '</div>');
     wireStaffNav();
     el('igo').onclick = function () {
-      api('staff.issueCreate', { category: el('ic').value, text: el('it').value })
+      busy(el('igo'), api('staff.issueCreate', { category: el('ic').value, text: el('it').value }))
         .then(vIssues).catch(function (e) { el('msg').innerHTML = '<div class="err">' + esc(e.message) + '</div>'; });
     };
     Array.prototype.forEach.call(document.querySelectorAll('[data-close]'), function (b) {
@@ -1842,12 +1951,12 @@ function vIssues() {
           .then(vIssues).catch(function (e) { alert(e.message); });
       };
     });
-  }).catch(function (e) { if (e.code === 'auth' || e.code === 'forbidden') return logout(); render('<div class="err">' + esc(e.message) + '</div>'); });
+  }).catch(staffErr);
 }
 
 function vBcast() {
   loading(2);
-  api('meta.broadcasts', {}).then(function (d) {
+  vapi('meta.broadcasts', {}).then(function (d) {
     var rows = d.broadcasts.map(function (b) {
       return '<div class="tip"><b>' + esc(b.title) + '</b><div>' + esc(b.body) + '</div>' +
         '<div class="hint">' + esc(b.at) + '</div>' +
@@ -1862,7 +1971,7 @@ function vBcast() {
       '<div class="card"><h2>Active</h2>' + rows + '</div>');
     wireStaffNav();
     el('bgo').onclick = function () {
-      api('admin.broadcast', { title: el('bt').value, body: el('bb').value })
+      busy(el('bgo'), api('admin.broadcast', { title: el('bt').value, body: el('bb').value }))
         .then(vBcast).catch(function (e) { el('msg').innerHTML = '<div class="err">' + esc(e.message) + '</div>'; });
     };
     Array.prototype.forEach.call(document.querySelectorAll('[data-end]'), function (b) {
@@ -1871,7 +1980,7 @@ function vBcast() {
           .catch(function (e) { alert(e.message); });
       };
     });
-  }).catch(function (e) { if (e.code === 'auth' || e.code === 'forbidden') return logout(); render('<div class="err">' + esc(e.message) + '</div>'); });
+  }).catch(staffErr);
 }
 
 function vStaff(msg) {
@@ -1932,7 +2041,7 @@ function vStaff(msg) {
 function vVet(tab) {
   tab = tab || 'fresh';
   loading(3);
-  Promise.all([api('vet.queue', {}), api('staff.alerts', {}).catch(function () { return { alerts: [] }; })])
+  Promise.all([vapi('vet.queue', {}), vapi('staff.alerts', {}).catch(function () { return { alerts: [] }; })])
   .then(function (both) {
     var q = both[0];
     var alerts = (both[1].alerts || []).map(function (n) {
@@ -1945,7 +2054,7 @@ function vVet(tab) {
         return '<tr class="' + ((r.sla_breach || r.resolve_breach) ? 'breach' : '') + '">' +
           '<td><a href="#t/' + esc(r.ticket) + '"><b>' + esc(r.ticket) + '</b></a>' +
           (r.emergency ? ' <span class="badge b-ESCALATED">EMG</span>' : '') +
-          '<br><span class="hint">' + r.minutes_open + ' min</span></td>' +
+          '<br><span class="hint">' + esc(r.minutes_open) + ' min</span></td>' +
           '<td>' + esc(spLabel(r.species)) + '<br><span class="hint">' +
           esc(r.service ? r.service.en : syLabel(r.symptom)) + '</span></td>' +
           '<td>' + esc(r.village) + '<br><span class="hint">' + esc(r.mandal) + '</span></td>' +
@@ -1967,7 +2076,7 @@ function vVet(tab) {
       '<div class="rowline"><button class="btn small ' + (q.on_call ? 'green' : 'amber') + '" id="avbtn">' +
       (q.on_call ? '🟢 On call — tap to go off' : '🟠 Off call — tap to go on') + '</button></div>' +
       '<p class="hint">' + (q.jurisdiction && q.jurisdiction.length
-        ? 'Your centres: <b>' + q.jurisdiction.join(', ') + '</b> — you see cases routed to them (and unrouted ones).'
+        ? 'Your centres: <b>' + esc(q.jurisdiction.join(', ')) + '</b> — you see cases routed to them (and unrouted ones).'
         : (S.user.role === 'admin' ? 'District-wide view.' : 'District-wide view (this account is not mapped to a centre in the staff master).')) +
       ' Red rows breach response or resolution SLA.</p>' +
       '<div class="tabs">' +
@@ -2007,12 +2116,12 @@ function vVet(tab) {
     });
     el('lo').onclick = function (ev) { ev.preventDefault(); logout(); };
     startPoll(function () { vVet(tab); });
-  }).catch(function (e) { if (e.code === 'auth' || e.code === 'forbidden') return logout(); render('<div class="err">' + esc(e.message) + '</div>'); });
+  }).catch(staffErr);
 }
 
 function vAdmin() {
   loading(4);
-  Promise.all([api('admin.stats', {}), api('admin.links', {}).catch(function () { return {}; })])
+  Promise.all([vapi('admin.stats', {}), vapi('admin.links', {}).catch(function () { return {}; })])
   .then(function (both) {
     var st = both[0], lk = both[1];
     // authuser pins Google links to the account this admin logged in with, so they
@@ -2027,7 +2136,7 @@ function vAdmin() {
       '<a class="btn small ghost" target="_blank" rel="noopener" href="https://github.com/jangaoncdm/jps-app">🛠️ App repo</a>' +
       '</div></div>';
     var mrows = Object.keys(st.byMandal).sort(function (a, b) { return st.byMandal[b] - st.byMandal[a]; })
-      .map(function (m) { return '<tr><td>' + esc(m) + '</td><td>' + st.byMandal[m] + '</td></tr>'; }).join('') ||
+      .map(function (m) { return '<tr><td>' + esc(m) + '</td><td>' + esc(st.byMandal[m]) + '</td></tr>'; }).join('') ||
       '<tr><td colspan="2" class="hint">No data yet</td></tr>';
     var vrows = st.vets.map(function (v) {
       return '<tr><td>' + esc(v.name) + '</td><td>' + esc(v.email) + '<br><span class="hint">' + esc(v.phone) + '</span></td></tr>';
@@ -2035,7 +2144,7 @@ function vAdmin() {
     var orows = st.openList.map(function (r) {
       return '<tr class="' + (r.sla_breach ? 'breach' : '') + '"><td><a href="#t/' + esc(r.ticket) + '"><b>' + esc(r.ticket) + '</b></a>' +
         (r.emergency ? ' <span class="badge b-ESCALATED">EMG</span>' : '') + '</td>' +
-        '<td>' + badge(r.status) + '</td><td>' + esc(r.mandal) + '</td><td>' + r.minutes_open + ' min</td></tr>';
+        '<td>' + badge(r.status) + '</td><td>' + esc(r.mandal) + '</td><td>' + esc(r.minutes_open) + ' min</td></tr>';
     }).join('') || '<tr><td colspan="4" class="hint">No open requests</td></tr>';
     render(
       '<h1>District dashboard</h1>' + staffNav('#admin') +
@@ -2056,8 +2165,31 @@ function vAdmin() {
           (L.avgFirstResponseMin == null ? '—' : L.avgFirstResponseMin + ' min') + '</b> (' + L.responded + ' responded)</p>' +
           bar('GREEN — advice closed', L.byDisposition.GREEN, 'var(--ok)') +
           bar('AMBER — visits', L.byDisposition.AMBER, 'var(--accent)') +
-          bar('RED — escalated 1962', L.byDisposition.RED, 'var(--red)') + '</div>';
-      })() + quick +
+          bar('RED — escalated 1962', L.byDisposition.RED, 'var(--red)') +
+          // The permanent breach ledger. The headline SLA number above counts only cases
+          // that are open AND untouched right now, so a breach used to disappear from the
+          // district's view the moment any vet claimed the case.
+          '<div class="sh" style="margin-top:12px"><h2>First response, last 30 days</h2></div>' +
+          '<p><b style="color:var(--red)">' + esc(L.responseLate) + '</b> answered late or not at all' +
+          (L.total ? ' <span class="hint">(' + Math.round(L.responseLate / L.total * 100) + '% of ' +
+            esc(L.total) + ')</span>' : '') + '</p>' +
+          '<p><b>' + esc(L.neverResponded) + '</b> never answered at all</p>' +
+          '<p class="hint">Counted from the filed and first-response times, so claiming or ' +
+          'withdrawing a case no longer clears it from this count.</p></div>';
+      })() +
+      // Staff the master maps to no centre: district-wide case access, and attendance that
+      // cannot be geo-fenced because there is no centre to measure against.
+      (st.unmapped_staff && st.unmapped_staff.length
+        ? '<div class="card"><h2>⚠️ Staff master incomplete</h2>' +
+          '<p><b>' + esc(st.unmapped_staff.length) + '</b> staff rows are mapped to no centre. ' +
+          'Those accounts see every case in the district and their attendance cannot be ' +
+          'geo-fenced. Fill the facility column in the staff master to close this.</p>' +
+          '<table><tr><th>Name</th><th>Designation</th><th>Contact</th></tr>' +
+          st.unmapped_staff.slice(0, 60).map(function (x) {
+            return '<tr><td>' + esc(x.name) + '</td><td>' + esc(x.designation) + '</td><td>' +
+              esc(x.email || x.mobile || '—') + '</td></tr>';
+          }).join('') + '</table></div>'
+        : '') + quick +
       '<div class="card"><h2>Open requests</h2><table><tr><th>Token</th><th>Status</th><th>Mandal</th><th>Age</th></tr>' + orows + '</table>' +
       '<p class="hint">Full data lives in the Google Sheet — open it for filters, pivots and exports.</p></div>' +
       '<div class="card"><h2>Requests by mandal</h2><table><tr><th>Mandal</th><th>#</th></tr>' + mrows + '</table></div>' +
@@ -2070,16 +2202,23 @@ function vAdmin() {
       '<p style="text-align:center"><a href="#" id="lo" class="hint">Logout</a></p>');
     wireStaffNav();
     el('ab').onclick = function () {
-      api('admin.addVet', { name: el('an').value, email: el('ae').value, phone: el('ap').value })
+      busy(el('ab'), api('admin.addVet',
+        { name: el('an').value, email: el('ae').value, phone: el('ap').value }))
         .then(function (d) {
+          // The backend keeps only the HMAC of this code, so it cannot be shown twice.
+          // admin.addVet bumps the rev, which is exactly what the screen's own poll
+          // watches for -- it used to repaint within 25 s and wipe the code, leaving no
+          // way to recover it but adding the vet again. Stop polling while it is on screen.
+          stopPoll();
           el('codebox').innerHTML = d.access_code
-            ? '<div class="ok">Vet added. One-time access code (share securely): <b>' + esc(d.access_code) + '</b></div>'
+            ? '<div class="ok" data-keep>Vet added. One-time access code (share securely): <b>' +
+              esc(d.access_code) + '</b><br><span class="hint">Copy it now — it cannot be shown again.</span></div>'
             : '<div class="ok">Vet added.</div>';
         }).catch(function (e) { el('codebox').innerHTML = '<div class="err">' + esc(e.message) + '</div>'; });
     };
     el('lo').onclick = function (ev) { ev.preventDefault(); logout(); };
     startPoll(function () { vAdmin(); });
-  }).catch(function (e) { if (e.code === 'auth' || e.code === 'forbidden') return logout(); render('<div class="err">' + esc(e.message) + '</div>'); });
+  }).catch(staffErr);
 }
 
 // ---------------------------------------------------------------- router
@@ -2110,7 +2249,23 @@ function paintTabs() {
     '<a href="tel:1962" class="sos"><span class="ic">🚑</span><span class="tx">1962</span></a>';
 }
 
+/** A staff screen could not load. Only a dead session is a reason to sign out: a farmer
+ *  with '#vet' still in their history (a shared phone, a tapped link) used to be logged
+ *  out by it and had to identify themselves again. Send them where they belong instead. */
+function staffErr(e) {
+  if (e.code === 'auth') return logout();
+  if (e.code === 'forbidden') { location.hash = homeHash(); return; }
+  render('<div class="err">' + esc(e.message) + '</div>');
+}
+
+/** Where a signed-in user belongs when there is no hash to go on. */
+function homeHash() {
+  if (!S.token || !S.user) return '#identify';
+  return S.user.role === 'admin' ? '#admin' : (S.user.role === 'vet' ? '#vet' : '#home');
+}
+
 function route() {
+  S.nav++;    // anything still in flight for the previous screen is now stale
   stopCam();  // release the camera whenever the screen changes
   // Drop any poll the previous screen left running. A poll re-renders its view
   // wholesale, so one surviving a navigation would wipe a half-filled form.
@@ -2118,6 +2273,9 @@ function route() {
   stopPoll();
   paintTabs();
   var h = location.hash || '';
+  // Boot pushes '#home' onto the bare URL, so Back lands on the empty hash. Without this
+  // a signed-in user was shown the sign-in screen by pressing Back once.
+  if (!h || h === '#') h = homeHash();
   if (h.indexOf('#t/') === 0) return vTicket(h.slice(3));
   if (h === '#staff') return vStaff();
   if (h === '#vet') return vVet();
