@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.7.1-M6 b019
+/* JPS app.js — BUILD JPS v0.7.1-M6 b020
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.7.1-M6 b019';
+var BUILD = 'JPS v0.7.1-M6 b020';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', ic:'cow' }, { v:'buffalo', te:'గేదె', en:'Buffalo', ic:'buffalo' },
@@ -2273,6 +2273,9 @@ function vStaff(msg) {
       '<label>Mobile number</label>' +
       '<input id="eph" type="tel" inputmode="numeric" maxlength="10" ' +
         'placeholder="10-digit mobile" value="' + esc(keep.eph || '') + '">' +
+      '<label>Email <span class="en">only if your mobile is not on file yet</span></label>' +
+      '<input id="email" type="email" autocomplete="username" placeholder="your@email" ' +
+        'value="' + esc(keep.eemail || '') + '">' +
       '<label>One-time access code</label>' +
       '<input id="ecode" type="text" autocapitalize="characters" maxlength="10" ' +
         'placeholder="10 characters"' + (keep.ecode ? ' value="' + esc(keep.ecode) + '"' : '') + '>' +
@@ -2325,18 +2328,18 @@ function vStaff(msg) {
     var pin = el('epin').value, pin2 = el('epin2').value;
     if (pin !== pin2) {
       return vStaff({ ok: false, text: 'The two PINs do not match', enrol: true,
-                      eph: el('eph').value, ecode: el('ecode').value });
+                      eph: el('eph').value, eemail: el('email').value, ecode: el('ecode').value });
     }
     busy(el('ebtn'), api('staff.pinSet',
-      { phone: el('eph').value, code: el('ecode').value, pin: pin }))
+      { phone: el('eph').value, email: el('email').value, code: el('ecode').value, pin: pin }))
       .then(function (d) {
         try { localStorage.setItem('jps_staff_phone', el('eph').value); } catch (er) {}
         saveAuth(d.token, d.user);
         location.hash = d.user.role === 'admin' ? '#admin' : '#vet';
       })
       .catch(function (e) {
-        vStaff({ ok: false, text: e.message, enrol: true,
-                 eph: el('eph').value, ecode: el('ecode').value });
+        vStaff({ ok: false, text: e.message, enrol: true, eph: el('eph').value,
+                 eemail: el('email').value, ecode: el('ecode').value });
       });
   };
 
