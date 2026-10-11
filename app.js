@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.7.1-M6 b015
+/* JPS app.js — BUILD JPS v0.7.1-M6 b016
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.7.1-M6 b015';
+var BUILD = 'JPS v0.7.1-M6 b016';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', ic:'cow' }, { v:'buffalo', te:'గేదె', en:'Buffalo', ic:'buffalo' },
@@ -2412,21 +2412,65 @@ function dismissSplash() {
 var BOOT = Date.now();
 if (el('bld')) el('bld').textContent = BUILD;
 
-api('meta.info', {}).then(function (m) {
-  S.meta = m;
-  if (S.token && S.user) {
-    location.hash = S.user.role === 'farmer' ? (location.hash || '#home')
-      : (S.user.role === 'admin' ? (location.hash || '#admin') : (location.hash || '#vet'));
-    route();
-    dismissSplash();
-    tryRegisterPush();
-  } else {
-    location.hash = location.hash === '#staff' ? '#staff' : '#identify';
-    route();
-    dismissSplash();
-  }
-}).catch(function () {
+/* The boot call is the farmer's first impression and the only failure with no screen
+   behind it. The old copy said "Set API_URL in app.js" for every failure, which is true
+   only when the URL is genuinely a placeholder - during a transient Apps Script slowdown
+   it sends the district hunting a config bug that is not there, and gives the farmer,
+   who cannot edit app.js, nothing to do. We keep the 30 s budget (a village tower can
+   take 20 s to answer and still succeed), but we say we are still trying, and we always
+   leave a way out: retry, and 1962. */
+var bootSlow = null;
+function bootDone() { if (bootSlow) { clearTimeout(bootSlow); bootSlow = null; } }
+
+function bootFail() {
+  bootDone();
   dismissSplash();
-  render('<div class="err">సర్వర్‌కు కనెక్ట్ కాలేకపోయాం — API_URL సెట్ చేయాలి<br>' +
-    'Cannot reach server. Set API_URL in app.js to the Apps Script /exec URL.</div>');
-});
+  var unset = !/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(API_URL);
+  render(
+    '<div class="card" style="text-align:center">' +
+      '<div class="bootwarn">' + icon('warn') + '</div>' +
+      '<h1 style="font-size:20px;margin:10px 0 7px">' +
+        esc(T('సర్వర్ అందుబాటులో లేదు', 'Cannot reach the server')) + '</h1>' +
+      '<p class="hint">' + esc(T(
+        'ఇంటర్నెట్ చూసుకుని మళ్లీ ప్రయత్నించండి. సమస్య కొనసాగితే కొద్దసేపటి తర్వాత ప్రయత్నించండి.',
+        'Check your internet and try again. If it keeps failing the service is busy — try again shortly.')) + '</p>' +
+      '<div style="height:15px"></div>' +
+      '<button class="btn" id="rety">' + icon('refresh') + ' ' +
+        esc(T('మళ్లీ ప్రయత్నించండి', 'Try again')) + '</button>' +
+      (unset ? '<p class="hint" style="margin-top:13px;color:var(--red)">' +
+        'Set API_URL in app.js to the Apps Script /exec URL.</p>' : '') +
+    '</div>' +
+    '<a class="sosbar" href="tel:1962"><span class="sb-ic">' + icon('ambulance') + '</span>' +
+      '<span><b>' + esc(T('అత్యవసరమా? 1962', 'Emergency? Call 1962')) + '</b>' +
+      '<span class="hint">' + esc(T('యాప్ పని చేయకపోయినా ఈ నంబర్ పని చేస్తుంది',
+        'This number works even when the app does not')) + '</span></span></a>');
+  el('rety').onclick = boot;
+}
+
+function boot() {
+  loading(2);
+  bootDone();
+  // 8 s of a silent skeleton reads as a dead app; say the network is slow instead.
+  bootSlow = setTimeout(function () {
+    var v = el('view');
+    if (v) v.insertAdjacentHTML('afterbegin', '<p class="hint" id="bootslow" style="text-align:center">' +
+      esc(T('ఇంకా ప్రయత్నిస్తున్నాం… నెట్‌వర్క్ నెమ్మదిగా ఉంది',
+        'Still trying — the network is slow')) + '</p>');
+  }, 8000);
+  api('meta.info', {}).then(function (m) {
+    bootDone();
+    S.meta = m;
+    if (S.token && S.user) {
+      location.hash = S.user.role === 'farmer' ? (location.hash || '#home')
+        : (S.user.role === 'admin' ? (location.hash || '#admin') : (location.hash || '#vet'));
+      route();
+      dismissSplash();
+      tryRegisterPush();
+    } else {
+      location.hash = location.hash === '#staff' ? '#staff' : '#identify';
+      route();
+      dismissSplash();
+    }
+  }).catch(bootFail);
+}
+boot();
