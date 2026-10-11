@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.7.1-M6 b016
+/* JPS app.js — BUILD JPS v0.7.1-M6 b017
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.7.1-M6 b016';
+var BUILD = 'JPS v0.7.1-M6 b017';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', ic:'cow' }, { v:'buffalo', te:'గేదె', en:'Buffalo', ic:'buffalo' },
@@ -640,6 +640,144 @@ var SPECIES_CARE = {
   ]
 };
 function speciesCare(v) { return SPECIES_CARE[v] || SPECIES_CARE.other; }
+
+/* The 100 do's that rotate at the top of every farmer screen. Husbandry and
+   prevention only - no drug names, no dosages - because the point of this app is to
+   put a government vet on the call; anything urgent in here ends at the vet or 1962.
+   They live in the client, not in Broadcasts: a farmer on a dead network still gets
+   them, they cost no Sheet row and no rev bump, and the district's notice carousel
+   stays free for real notices. Icons are sprite names (invariant 19). */
+var TIPS100 = [
+  ['drops','ఎప్పుడూ శుభ్రమైన తాగునీరు అందుబాటులో ఉంచండి','Keep clean drinking water available at all times'],
+  ['drops','ఎండాకాలంలో రోజుకు 3–4 సార్లు నీరు తాగించండి','In summer let animals drink three or four times a day'],
+  ['drops','నీటి తొట్టెను రోజూ కడగండి — నాచు వ్యాధులు తెస్తుంది','Wash the water trough daily; green slime carries disease'],
+  ['buffalo','గేదెలకు మధ్యాహ్నం నీడ లేదా నీటి కుంట తప్పనిసరి','Buffaloes need shade or a wallow through the afternoon'],
+  ['grain','రోజూ ఖనిజ లవణ మిశ్రమం మేతలో కలపండి','Mix mineral supplement into the ration every day'],
+  ['drops','ఎండు మేత వేసే ముందు నీరు తాగించండి','Let the animal drink before you feed dry fodder'],
+  ['grain','పచ్చి మేత, ఎండు మేత కలిపి వేయండి','Feed green fodder and dry fodder together'],
+  ['tools','మేతను కత్తిరించి వేస్తే వృథా తగ్గి జీర్ణం బాగుంటుంది','Chaff the fodder: less waste and better digestion'],
+  ['chart','పాల దిగుబడిని బట్టి దాణా ఇవ్వండి, అలవాటును బట్టి కాదు','Feed concentrate by milk yield, not by habit'],
+  ['grain','కొత్త మేతను వారం రోజుల్లో మెల్లగా అలవాటు చేయండి','Introduce any new feed slowly over a week'],
+  ['warn','బూజు పట్టిన మేత ఈనిక చెడగొడుతుంది — పొడిగా నిల్వ చేయండి','Mouldy feed causes abortion; store fodder dry'],
+  ['grain','పాలిచ్చే పశువుకు రోజూ 50 గ్రా ఖనిజ మిశ్రమం','50 g of mineral mixture a day for a milch animal'],
+  ['cow','ఉదయం చల్లని వేళలో మేపండి','Graze in the cool morning hours'],
+  ['grain','కొట్టంలో ఉప్పు బెడ్డ అందుబాటులో ఉంచండి','Keep a salt lick in the shed'],
+  ['grain','అజొల్లా, బెర్సీమ్ — చౌకైన ప్రొటీన్','Azolla and berseem are cheap protein'],
+  ['calendar','మేత వేసే సమయం అకస్మాత్తుగా మార్చవద్దు','Do not change the feeding time suddenly'],
+  ['drops','ముసలి పశువులకు ఎండు మేతను నానబెట్టి వేయండి','Soak dry fodder for older animals'],
+  ['bottle','చూడి పశువుకు చివరి రెండు నెలలు అదనపు మేత','Extra feed for a pregnant animal in the last two months'],
+  ['syringe','గాలికుంటు టీకా — ఆరు నెలలకు ఒకసారి','Foot-and-mouth vaccination every six months'],
+  ['syringe','వర్షాకాలానికి ముందు గళ్ళకుంటు (HS) టీకా','HS (galghotu) vaccine before the monsoon'],
+  ['syringe','లేగదూడలకు వర్షాలకు ముందు జబ్బవాపు (BQ) టీకా','Black quarter vaccine for young cattle before the rains'],
+  ['goat','మేకలు, గొర్రెలకు పీపీఆర్ టీకా — మూడేళ్లకు ఒకసారి','PPR vaccine for goats and sheep once in three years'],
+  ['poultry','కోళ్లకు కొక్కెర తెగులు టీకా సకాలంలో','Keep Ranikhet vaccination on schedule for poultry'],
+  ['dog','కుక్కకు రేబిస్ టీకా — ఏటా ఒకసారి','Rabies vaccine for the farm dog every year'],
+  ['syringe','4–8 నెలల ఆడ దూడలకే బ్రుసెల్లోసిస్ టీకా','Brucellosis vaccine only for female calves 4-8 months'],
+  ['tag','టీకా కార్డును చెవి ట్యాగ్ నంబర్‌తో కలిపి భద్రపరచండి','Keep the vaccination card with the ear tag number'],
+  ['calendar','మధ్యాహ్నం ఎండలో కాకుండా ఉదయం టీకా వేయించండి','Vaccinate in the cool morning, not the midday heat'],
+  ['clinic','టీకా తర్వాత పశువు ఇబ్బంది పడితే కేంద్రానికి తెలపండి','Tell the centre if an animal reacts after vaccination'],
+  ['worm','పశువులకు ఏడాదికి కనీసం రెండుసార్లు నులిపురుగుల మందు','Deworm cattle at least twice a year'],
+  ['worm','వర్షాకాలంలో మేకలు, గొర్రెలకు మూడు నెలలకోసారి','Deworm goats and sheep every three months in the rains'],
+  ['worm','దూడలకు నెల వయసు నుంచి ఆరు నెలల వరకు నెలనెలా','Deworm calves monthly from one month to six months'],
+  ['chart','మందు మోతాదు బరువును బట్టి — ముందు తూకం చూడండి','Weigh the animal first so the dose matches'],
+  ['skin','వర్షాకాలానికి ముందు గోమార్లకు మందు పిచికారీ','Spray against ticks before the monsoon'],
+  ['tools','గోమార్లు దాక్కునే కొట్టం మూలలు శుభ్రం చేయండి','Clean the shed corners where ticks hide'],
+  ['warn','కొత్త పశువును రెండు వారాలు వేరుగా ఉంచండి','Keep a newly bought animal apart for two weeks'],
+  ['grain','మేపే చోటు మారుస్తూ ఉంటే పురుగుల చక్రం తెగుతుంది','Rotate grazing ground to break the worm cycle'],
+  ['milk','పాలు పితికే ముందు చేతులు, పొదుగు కడగండి','Wash your hands and the udder before milking'],
+  ['calendar','రోజూ ఒకే రెండు వేళల్లో పాలు పితకండి','Milk at the same two times every day'],
+  ['milk','మొదటి కొన్ని చుక్కలు వేరే గిన్నెలో తీసి చూడండి','Strip the first few squirts into a separate cup and look'],
+  ['milk','పొదుగు పూర్తిగా ఖాళీ చేయండి — మిగిలితే పొదుగువాపు','Milk the udder out fully; leftover milk invites mastitis'],
+  ['milk','పితికిన తర్వాత చన్నులను మందు నీటిలో ముంచండి','Dip the teats after milking'],
+  ['warn','వ్యాధి ఉన్న భాగాన్ని చివర పితికి ఆ పాలు పారబోయండి','Milk the infected quarter last and discard that milk'],
+  ['phone','పొదుగు వేడిగా, గట్టిగా ఉంటే అది పొదుగువాపు — డాక్టర్‌కి','A hot, hard udder is mastitis - call the vet'],
+  ['tools','పాలు పితికే చోటు పొడిగా, శుభ్రంగా ఉంచండి','Keep the milking place dry and clean'],
+  ['cow','పితికిన అరగంట వరకు పశువును పడుకోనివ్వవద్దు','Do not let the animal lie down for 30 minutes after milking'],
+  ['pill','మందు వాడిన తర్వాత పాలు మానే గడువు పాటించండి','Observe the milk withdrawal period after any medicine'],
+  ['calendar','కట్టించిన తేదీ రాసుకోండి — సుమారు 280 రోజులకు ఈనుతుంది','Note the breeding date; calving is about 280 days later'],
+  ['milk','ఈనడానికి రెండు నెలల ముందు పాలు ఆపేయండి','Dry the cow off two months before calving'],
+  ['clinic','ఈనే ముందు శుభ్రమైన, పొడి, వేరే చోటికి మార్చండి','Move her to a clean dry separate pen before calving'],
+  ['bottle','పుట్టిన రెండు గంటల్లోపు జున్నుపాలు తాగించండి','Feed colostrum within the first two hours'],
+  ['drops','పుట్టగానే బొడ్డుకు అయోడిన్ రాయండి','Dip the navel in iodine at birth'],
+  ['phone','మాయ 8 గంటల్లో పడాలి — లేకపోతే డాక్టర్‌కి కాల్ చేయండి','The placenta should come away within 8 hours, else call'],
+  ['ambulance','ఈత కష్టమైనప్పుడు బలవంతంగా లాగవద్దు — 1962','Never pull during a difficult calving - call 1962'],
+  ['calendar','ఉదయం, సాయంత్రం ఎదకు వచ్చిన లక్షణాలు గమనించండి','Watch for heat signs every morning and evening'],
+  ['syringe','ఎద కనిపించిన 12 గంటలకు కృత్రిమ గర్భధారణ','Inseminate about 12 hours after heat is first seen'],
+  ['clinic','60 రోజులకు చూడి పరీక్ష చేయించండి','Get a pregnancy check at 60 days'],
+  ['drops','కోళ్ల నీటి తొట్టె రోజూ కడగాలి','Wash the poultry drinker every day'],
+  ['poultry','పిల్లలకు మొదటి రెండు వారాలు వెచ్చదనం ఇవ్వండి','Give chicks warmth for the first two weeks'],
+  ['grain','దాణా నేలపై కాకుండా తొట్టెలో వేయండి','Keep feed in a feeder, not on the floor'],
+  ['warn','అకస్మాత్తుగా ఎక్కువ కోళ్లు చనిపోతే వెంటనే తెలపండి','Report any sudden run of deaths at once'],
+  ['poultry','బాతులను, కోళ్లను వేరుగా ఉంచండి','Keep ducks and chickens separate'],
+  ['worm','రెండు నెలలకోసారి కోళ్లకు నులిపురుగుల మందు','Deworm the flock every two months'],
+  ['tools','పరుపు (లిట్టర్) పొడిగా ఉంచండి — తడి ఉంటే రక్త విరేచనాలు','Keep the litter dry; wet litter causes coccidiosis'],
+  ['poultry','కొట్టంలో రద్దీ ఉండకూడదు','Do not crowd the shed'],
+  ['ban','అడవి పక్షులు రాకుండా వల కట్టండి','Net the shed to keep wild birds out'],
+  ['check','గుడ్లను రోజుకు రెండుసార్లు సేకరించండి','Collect eggs twice a day'],
+  ['paw','వర్షాకాలానికి ముందు గిట్టలు కత్తిరించండి','Trim hooves before the monsoon'],
+  ['goat','తడి నేలపై ఎక్కువసేపు నిలబెట్టవద్దు — కాళ్ల కుళ్లు','Do not keep them standing on wet ground - foot rot'],
+  ['sheep','కొట్టం ఎత్తుగా, గాలి ఆడేలా ఉంచండి','Keep the shed raised and airy'],
+  ['goat','చూడి మేకల నుంచి పోతును వేరు చేయండి','Keep the buck away from pregnant does'],
+  ['bottle','మేక పిల్లలకు రెండు గంటల్లోపు జున్నుపాలు','Colostrum for kids within two hours'],
+  ['warn','చిగుళ్లు తెల్లగా ఉంటే అది నులిపురుగులు','Pale gums mean worms'],
+  ['sheep','ఎండాకాలానికి ముందు గొర్రెల ఉన్ని కత్తిరించండి','Shear sheep before the hot season'],
+  ['warn','కొత్తగా కొన్న జంతువును రెండు వారాలు వేరుగా ఉంచండి','Quarantine a newly bought animal for two weeks'],
+  ['fever','ఒక రోజు మేత మానేస్తే వెంటనే గమనించండి','An animal off feed for a day needs attention'],
+  ['fever','నీరసంగా ఉంటే జ్వరం చూడండి','Check the temperature if the animal looks dull'],
+  ['blood','పేడలో లేదా మూత్రంలో రక్తం — అదే రోజు డాక్టర్‌కి','Blood in the dung or urine - call the vet the same day'],
+  ['bloat','ఎడమ పక్క ఉబ్బితే అది అపానవాయువు — వెంటనే కాల్ చేయండి','A swollen left flank is bloat - call at once'],
+  ['warn','నోట్లో పొక్కులు, చొంగ — గాలికుంటు, వెంటనే తెలపండి','Drooling and mouth blisters - report FMD at once'],
+  ['chart','పాలు అకస్మాత్తుగా తగ్గడం వ్యాధికి తొలి సంకేతం','A sudden drop in milk is an early disease sign'],
+  ['warn','ఒకేసారి చాలా పశువులు కుంటితే తప్పక తెలపండి','Lameness in many animals at once must be reported'],
+  ['warn','జబ్బు పడిన పశువును మంద నుంచి వేరు చేయండి','Isolate a sick animal from the herd'],
+  ['fever','ఊపిరి వేగంగా ఉంటే జ్వరం లేదా ఊపిరితిత్తుల సమస్య','Fast breathing means fever or pneumonia'],
+  ['blood','వర్షాకాలంలో గాయాల్లో పురుగులు పడతాయి — చూస్తూ ఉండండి','Watch for maggots in wounds in the rainy season'],
+  ['blood','ఏ గాయాన్నైనా అదే రోజు కట్టు కట్టండి','Dress every wound the same day'],
+  ['snake','పాము కాటుకు నాటు వైద్యం వద్దు — 1962కి కాల్ చేయండి','No home remedies for snakebite - call 1962'],
+  ['warn','ఎండాకాలం 11 నుంచి 4 గంటల వరకు నీడలో ఉంచండి','Keep animals in shade from 11 am to 4 pm in summer'],
+  ['drops','మండు వేసవిలో గేదెలపై నీళ్లు చల్లండి','Sprinkle water on buffaloes in peak summer'],
+  ['tools','మూత్రం పారిపోయేలా నేలకు వాలు ఉండాలి','Slope the floor so urine drains away'],
+  ['tools','కొట్టం తడిగా ఉంటే కాళ్లు, పొదుగు పాడవుతాయి','A wet shed ruins feet and udders'],
+  ['tools','కొట్టంలో గాలి ఆడాలి — పూర్తిగా మూసివేయవద్దు','Let air move through the shed; never close it fully'],
+  ['warn','వడగాలులప్పుడు ఫ్యాన్ లేదా తడి గోనె సంచులు వాడండి','Use a fan or wet gunny bags in a heat wave'],
+  ['warn','చలికాలంలో చల్లని గాలి నుంచి కాపాడండి','Protect animals from cold winds in winter'],
+  ['tools','పేడను రోజూ తీసి కొట్టానికి దూరంగా కంపోస్ట్ చేయండి','Remove dung daily and compost it away from the shed'],
+  ['ban','ప్లాస్టిక్ కవర్లు, పాడైన మేత అందకుండా చూడండి','Keep plastic and spoiled feed out of reach'],
+  ['ban','పురుగుమందు చల్లిన పొలాల్లో వెంటనే మేపవద్దు','Do not graze on freshly sprayed fields'],
+  ['tag','చెవి ట్యాగ్ నంబర్ భద్రంగా నోట్ చేసుకోండి','Keep the ear tag number noted safely'],
+  ['book','ప్రతి చికిత్స, టీకా తేదీ రాసి పెట్టుకోండి','Write down every treatment and vaccination date'],
+  ['book','పశువుకు బీమా చేయించండి — శాఖ సహాయం చేస్తుంది','Insure your animal; the department will guide you'],
+  ['ambulance','ఏ అత్యవసరానికైనా 1962 — ఉచితం, 24 గంటలూ','For any emergency, 1962 - free, 24 hours']
+];
+
+/* The ticker lives in the shell, outside #view, so route() never destroys it and it
+   can never repaint over a half-filled form. One tip every 8 s, paused while the tab
+   is hidden. The start point moves with the date, so a farmer who only opens the app
+   in the morning does not see the same three tips for a month. */
+var tkAt = 0, tkTimer = null;
+function tkPaint() {
+  var box = el('ticker');
+  if (!box) return;
+  var t = TIPS100[tkAt % TIPS100.length];
+  el('tkic').innerHTML = icon(t[0]);
+  el('tktx').innerHTML = TL(t[1], t[2]);
+  el('tkn').textContent = ((tkAt % TIPS100.length) + 1) + '/' + TIPS100.length;
+  box.classList.remove('sw');
+  void box.offsetWidth;
+  box.classList.add('sw');
+}
+function tkStep() { tkAt = (tkAt + 1) % TIPS100.length; tkPaint(); }
+function tkStart() {
+  if (tkTimer) return;
+  var d = new Date();
+  tkAt = (d.getFullYear() * 372 + d.getMonth() * 31 + d.getDate()) % TIPS100.length;
+  tkPaint();
+  tkTimer = setInterval(function () {
+    if (document.hidden) return;        // no silent spinning in the background
+    tkStep();
+  }, 8000);
+}
+
 
 function vHome() {
   // #5: paint from what this session already has, so a tab you have opened before
@@ -2399,6 +2537,7 @@ setLang(S.lang);
 document.getElementById('langbtn').onclick = function () {
   setLang(S.lang === 'both' ? 'te' : (S.lang === 'te' ? 'en' : 'both'));
   route();
+  tkPaint();
 };
 
 function dismissSplash() {
@@ -2460,6 +2599,7 @@ function boot() {
   api('meta.info', {}).then(function (m) {
     bootDone();
     S.meta = m;
+    tkStart();
     if (S.token && S.user) {
       location.hash = S.user.role === 'farmer' ? (location.hash || '#home')
         : (S.user.role === 'admin' ? (location.hash || '#admin') : (location.hash || '#vet'));

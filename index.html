@@ -236,6 +236,22 @@ input[type="file"]{padding:13px 14px;font-size:14px}
 .err .en,.ok .en{display:block;margin-top:3px;color:inherit;opacity:.82;font-weight:500}
 .bootwarn{font-size:36px;line-height:1;color:var(--ink-3)}
 
+/* ---------------------------------------------------------------- care ticker */
+.ticker{display:flex;align-items:center;gap:11px;min-height:46px;padding:7px 15px;
+  background:var(--cta-50);color:var(--ink);text-decoration:none;
+  border-bottom:1px solid var(--line-2);overflow:hidden}
+body.staff .ticker{display:none}
+.tk-ic{flex:none;font-size:20px;color:var(--cta);display:flex;align-items:center}
+.tk-tx{flex:1;min-width:0;font-size:12.5px;line-height:1.35;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tk-tx .en{display:block;font-size:11px;color:var(--ink-2)}
+.tk-n{flex:none;font-size:10px;color:var(--cta-d);opacity:.75;
+  font-variant-numeric:tabular-nums}
+.ticker.sw .tk-ic,.ticker.sw .tk-tx{animation:tkIn .4s cubic-bezier(.2,.9,.3,1) both}
+@keyframes tkIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){
+  .ticker.sw .tk-ic,.ticker.sw .tk-tx{animation:none}}
+
 /* ---------------------------------------------------------------- data */
 /* fixed layout makes width:100% authoritative: with auto layout the staff roster's
    three columns pushed the admin dashboard 68px wider than a 360px phone, and the
@@ -423,7 +439,8 @@ nav.tabbar[hidden]{display:none}
 
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition:none!important}}
 @media print{
-  header.top,nav.tabbar,.btn,.rowline,.fixbar,.stickycta,#splash,#toast{display:none!important}
+  header.top,nav.tabbar,.btn,.rowline,.fixbar,.stickycta,#splash,#toast,
+  .ticker{display:none!important}
   .rxcard{border:0;box-shadow:none;padding:0}
   body{background:#fff}
   .wrap{padding:0;max-width:none}
@@ -682,6 +699,11 @@ nav.tabbar a.on .ic{animation:tabPop .32s cubic-bezier(.2,1.5,.4,1)}
   <button id="instTop" hidden><svg class="i" aria-hidden="true"><use xlink:href="#i-download" href="#i-download"/></svg> Install</button>
   <button id="langbtn" title="Language"></button>
 </header>
+<a class="ticker" id="ticker" href="#tips" aria-live="off">
+  <span class="tk-ic" id="tkic"></span>
+  <span class="tk-tx" id="tktx"></span>
+  <span class="tk-n" id="tkn"></span>
+</a>
 <div id="splash">
   <div class="crest">
     <div class="crest-row">
