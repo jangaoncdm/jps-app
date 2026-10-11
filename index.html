@@ -96,7 +96,7 @@ header.top{display:flex;align-items:center;gap:10px;background:var(--card);
 header.top .t{font-size:15.5px;font-weight:600;letter-spacing:-.01em;line-height:1.2;color:var(--ink)}
 header.top .s{font-size:10.5px;color:var(--ink-3);line-height:1.3;margin-top:1px}
 header.top .sp{flex:1}
-header.top button{min-height:34px;padding:7px 12px;border:0;border-radius:8px;
+header.top button{min-height:44px;padding:7px 14px;border:0;border-radius:22px;
   background:var(--app);color:var(--ink);font-family:inherit;font-size:12.5px;font-weight:700;
   cursor:pointer}
 header.top button:active{background:var(--cta-50)}
@@ -126,7 +126,7 @@ p + p{margin-top:8px}
   font-weight:600;line-height:1.25;text-align:center;color:#fff;background:var(--cta);
   border:0;border-radius:24px;cursor:pointer;transition:transform .09s ease,background .12s}
 .btn:active{transform:scale(.976);background:var(--cta-d)}
-.btn.small{display:inline-flex;width:auto;min-height:40px;padding:9px 16px;font-size:13.5px;
+.btn.small{display:inline-flex;width:auto;min-height:44px;padding:10px 16px;font-size:13.5px;
   border-radius:20px}
 .btn.ghost{background:transparent;color:var(--cta);box-shadow:inset 0 0 0 1.4px var(--line-2)}
 .btn.ghost:active{background:var(--cta-50)}
@@ -203,7 +203,7 @@ input[type="file"]{padding:13px 14px;font-size:14px}
 .b-RESOLVED{background:var(--green-50);color:var(--green)}
 .b-ESCALATED{background:var(--red-50);color:var(--red)}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
-.chip{min-height:40px;display:inline-flex;align-items:center;padding:8px 16px;border-radius:20px;
+.chip{min-height:44px;display:inline-flex;align-items:center;padding:8px 16px;border-radius:22px;
   background:var(--card);box-shadow:inset 0 0 0 1.5px var(--line-2);font-size:13.5px;
   font-weight:700;color:var(--ink-2);cursor:pointer;transition:transform .11s}
 .chip.on{background:var(--cta-50);box-shadow:none;color:var(--cta-d)}
@@ -232,9 +232,15 @@ input[type="file"]{padding:13px 14px;font-size:14px}
 .err,.ok{border-radius:var(--r-lg);padding:13px 15px;font-size:14px;font-weight:600;margin-bottom:11px}
 .err{background:var(--red-50);color:var(--red)}
 .ok{background:var(--green-50);color:var(--green)}
+/* the English detail under the Telugu line: .en's grey is unreadable on these grounds */
+.err .en,.ok .en{display:block;margin-top:3px;color:inherit;opacity:.82;font-weight:500}
 
 /* ---------------------------------------------------------------- data */
-table{width:100%;border-collapse:collapse;font-size:13.5px}
+/* fixed layout makes width:100% authoritative: with auto layout the staff roster's
+   three columns pushed the admin dashboard 68px wider than a 360px phone, and the
+   whole page scrolled sideways. Cells wrap instead. */
+table{width:100%;max-width:100%;table-layout:fixed;border-collapse:collapse;font-size:13.5px}
+td,th{overflow-wrap:break-word;word-break:break-word}
 th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-3);
   font-weight:700;padding:0 7px 7px 0;border-bottom:1.5px solid var(--line)}
 td{padding:11px 7px 11px 0;border-bottom:1px solid var(--line);vertical-align:top}
@@ -278,7 +284,7 @@ tr.breach td{background:var(--red-50)}
   position:sticky;top:calc(56px + env(safe-area-inset-top,0px));z-index:35;background:var(--app);
   border-bottom:1px solid var(--line);scrollbar-width:none}
 .staffnav::-webkit-scrollbar{display:none}
-.staffnav button{flex:none;min-height:40px;padding:8px 15px;border-radius:20px;border:0;
+.staffnav button{flex:none;min-height:44px;padding:8px 15px;border-radius:22px;border:0;
   background:var(--card);box-shadow:inset 0 0 0 1.5px var(--line);font-family:inherit;
   font-size:13px;font-weight:700;color:var(--ink-2);cursor:pointer}
 .staffnav button.on{background:var(--cta-50);color:var(--cta-d);box-shadow:none}
@@ -398,7 +404,7 @@ nav.tabbar[hidden]{display:none}
 .medno{width:23px;height:23px;flex:none;border-radius:50%;background:var(--cta);color:#fff;
   font-size:11.5px;font-weight:700;display:flex;align-items:center;justify-content:center}
 .medtop .m-name{flex:1;min-width:0}
-.medx{flex:none;width:40px;height:40px;min-height:40px;border:0;border-radius:8px;
+.medx{flex:none;width:44px;height:44px;min-height:44px;border:0;border-radius:10px;
   background:var(--red-50);color:var(--red);font-size:15px;font-weight:700;cursor:pointer;
   font-family:inherit}
 .medgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-top:9px}

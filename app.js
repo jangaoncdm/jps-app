@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.7.1-M6 b014
+/* JPS app.js — BUILD JPS v0.7.1-M6 b015
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.7.1-M6 b014';
+var BUILD = 'JPS v0.7.1-M6 b015';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', ic:'cow' }, { v:'buffalo', te:'గేదె', en:'Buffalo', ic:'buffalo' },
@@ -131,6 +131,40 @@ function T(te, en) { // plain text in the chosen language
   if (S.lang === 'en') return en;
   return te + ' · ' + en;
 }
+/* Invariant 3 reaches the error box too. The backend answers in English ("Missing/
+   invalid: species, village"), which a farmer who cannot read English can do nothing
+   with. Key the Telugu on the error code and keep the English detail after it, so the
+   farmer learns what to do and the office still sees which field failed. 'invalid' is
+   deliberately generic - it covers a dozen distinct backend messages. */
+var ERR_TE = {
+  auth: 'మళ్లీ లాగిన్ అవ్వండి',
+  bad_phone: 'సరైన 10 అంకెల మొబైల్ నంబర్ ఇవ్వండి',
+  blocked: 'ఈ నంబర్ బ్లాక్ అయ్యింది. పశువైద్య కార్యాలయాన్ని సంప్రదించండి',
+  cap: 'పరిమితి దాటింది',
+  daily_cap: 'ఈ రోజుకి అభ్యర్థనల పరిమితి ముగిసింది — రేపు ప్రయత్నించండి',
+  duplicate: 'ఇది ఇప్పటికే మీ జాబితాలో ఉంది',
+  forbidden: 'మీకు అనుమతి లేదు',
+  geo_fence: 'మీరు కేంద్రానికి దూరంగా ఉన్నారు',
+  gps_required: 'లొకేషన్ అవసరం — GPS ఆన్ చేయండి',
+  invalid: 'అవసరమైన వివరాలు నింపండి',
+  not_found: 'ఇది దొరకలేదు',
+  not_open: 'ఈ కేసు ఇప్పటికే ముగిసింది',
+  not_yours: 'ఇది మీ రికార్డు కాదు',
+  out_of_area: 'ఇది జనగామ జిల్లా పరిధిలో లేదు',
+  photo_big: 'ఫోటో చాలా పెద్దది — చిన్న ఫోటో పెట్టండి',
+  photo_required: 'ఫోటో అవసరం',
+  too_many: 'చాలాసార్లు విఫలమైంది — 15 నిమిషాల తర్వాత ప్రయత్నించండి',
+  unconfirmed_cap: 'మీకు ఇప్పటికే 2 అభ్యర్థనలు పెండింగ్లో ఉన్నాయి. డాక్టర్ కాల్ చేసిన తర్వాత కొత్తది పెట్టండి'
+};
+/** The error box a farmer reads: Telugu first, the backend's English detail second. */
+function errBox(e) {
+  var te = e && ERR_TE[e.code];
+  if (!te) return '<div class="err">' + esc((e && e.message) || '') + '</div>';
+  var en = (e.message || '').trim();
+  return '<div class="err">' + esc(te) +
+    (S.lang === 'te' || !en ? '' : '<span class="en">' + esc(en) + '</span>') + '</div>';
+}
+
 function TL(te, en) { // label HTML: Telugu with a small English line in 'both'
   if (S.lang === 'te') return esc(te);
   if (S.lang === 'en') return esc(en);
@@ -627,7 +661,7 @@ function vHome() {
     paintHome(data);
   }).catch(function (e) {
     if (e.code === 'auth') return logout();
-    if (!hit) render('<div class="err">' + esc(e.message) + '</div>');
+    if (!hit) render(errBox(e));
   });
 }
 
@@ -793,7 +827,7 @@ function vProfile() {
     })
     .catch(function (e) {
       if (e.code === 'auth') return logout();
-      if (!hit) render('<div class="err">' + esc(e.message) + '</div>');
+      if (!hit) render(errBox(e));
     });
 }
 
@@ -889,7 +923,7 @@ function paintProfile(data) {
       toast(T('ప్రొఫైల్ సేవ్ అయింది', 'Profile saved'));
       vProfile();
     }).catch(function (e) {
-      el('pmsg').innerHTML = '<div class="err">' + esc(e.message) + '</div>';
+      el('pmsg').innerHTML = errBox(e);
       window.scrollTo(0, 0);
     });
   };
@@ -1128,11 +1162,11 @@ function vNew(want) {
       }).catch(function (e) {
         el('go').disabled = false;
         el('go').classList.remove('busy');
-        el('msg').innerHTML = '<div class="err">' + esc(e.message) + '</div>';
+        el('msg').innerHTML = errBox(e);
         window.scrollTo(0, 0);
       });
     };
-  }).catch(function (e) { if (e.code === 'auth') return logout(); render('<div class="err">' + esc(e.message) + '</div>'); });
+  }).catch(function (e) { if (e.code === 'auth') return logout(); render(errBox(e)); });
 }
 function vTicket(ticket) {
   loading(3);
@@ -1375,7 +1409,7 @@ function vTicket(ticket) {
       });
     }
     startPoll(function () { if (location.hash === '#t/' + ticket) vTicket(ticket); });
-  }).catch(function (e) { if (e.code === 'auth') return logout(); render('<div class="err">' + esc(e.message) + '</div>'); });
+  }).catch(function (e) { if (e.code === 'auth') return logout(); render(errBox(e)); });
 }
 
 /* All of a user's requests, filterable. Everything here is already in farmer.myRequests. */
@@ -1413,7 +1447,7 @@ function vCases(filter) {
       b.onclick = function () { vCases(b.getAttribute('data-f')); };
     });
   }).catch(function (e) { if (e.code === 'auth') return logout();
-    render('<div class="err">' + esc(e.message) + '</div>'); });
+    render(errBox(e)); });
 }
 
 /* One card per ear tag, built by grouping the user's own request history. The backend has
@@ -1429,7 +1463,7 @@ function vAnimals() {
     })
     .catch(function (e) {
       if (e.code === 'auth') return logout();
-      if (!hit) render('<div class="err">' + esc(e.message) + '</div>');
+      if (!hit) render(errBox(e));
     });
 }
 
@@ -1515,7 +1549,7 @@ function vCentre() {
     })
     .catch(function (e) {
       if (e.code === 'auth') return logout();
-      if (!hit) render('<div class="err">' + esc(e.message) + '</div>');
+      if (!hit) render(errBox(e));
     });
 }
 
@@ -1655,7 +1689,7 @@ function vLoc(mode) {
       };
     }
   }).catch(function (e) { if (e.code === 'auth') return logout();
-    render('<div class="err">' + esc(e.message) + '</div>'); });
+    render(errBox(e)); });
 }
 
 /* Vaccination, derived from resolved PRV-01 visits. There is no vaccination register
@@ -1726,7 +1760,7 @@ function vVacc() {
       cards +
       '<a class="btn" href="#new">' + esc(T('\u0c1f\u0c40\u0c15\u0c3e \u0c15\u0c4b\u0c38\u0c02 \u0c05\u0c2d\u0c4d\u0c2f\u0c30\u0c4d\u0c25\u0c3f\u0c02\u0c1a\u0c02\u0c21\u0c3f', 'Request a vaccination')) + '</a>');
   }).catch(function (e) { if (e.code === 'auth') return logout();
-    render('<div class="err">' + esc(e.message) + '</div>'); });
+    render(errBox(e)); });
 }
 
 function vTips() {
@@ -2048,9 +2082,11 @@ function vStaff(msg) {
     (msg ? '<div class="' + (msg.ok ? 'ok' : 'err') + '">' + esc(msg.text) + '</div>' : '') +
     '<div class="card">' +
       '<label style="margin-top:0">Email</label>' +
-      '<input id="se" type="email" value="' + esc(localStorage.getItem('jps_staff_email') || '') + '">' +
+      '<input id="se" type="email" value="' +
+        esc((msg && msg.se) || localStorage.getItem('jps_staff_email') || '') + '">' +
       '<label>Access code</label>' +
-      '<input id="sc" type="text" autocapitalize="characters" placeholder="10 characters">' +
+      '<input id="sc" type="text" autocapitalize="characters" placeholder="10 characters"' +
+        ((msg && msg.sc) ? ' value="' + esc(msg.sc) + '"' : '') + '>' +
       '<div style="height:14px"></div>' +
       '<button class="btn" id="cbtn">Sign in</button>' +
       '<div class="orline"><span>or</span></div>' +
@@ -2059,10 +2095,10 @@ function vStaff(msg) {
         'client is configured. Until then use the access code.</p>' +
     '</div>' +
     (nb ? '<div class="card"><h2>First-time setup</h2>' +
-      '<label>Your email</label><input id="be" type="email">' +
-      '<label>Your name</label><input id="bn" type="text">' +
+      '<label>Your email</label><input id="be" type="email" value="' + esc((msg && msg.be) || '') + '">' +
+      '<label>Your name</label><input id="bn" type="text" value="' + esc((msg && msg.bn) || '') + '">' +
       '<label>Bootstrap code (from the setup() log)</label>' +
-      '<input id="bc" type="text" autocapitalize="characters">' +
+      '<input id="bc" type="text" autocapitalize="characters" value="' + esc((msg && msg.bc) || '') + '">' +
       '<div style="height:13px"></div><button class="btn" id="bbtn">Create admin</button></div>' : '') +
     '<p class="hint" style="text-align:center"><a href="#identify">← User app</a></p>');
   el('gbtn').onclick = function () {
@@ -2082,13 +2118,19 @@ function vStaff(msg) {
         saveAuth(d.token, d.user);
         location.hash = d.user.role === 'admin' ? '#admin' : '#vet';
       })
-      .catch(function (e) { vStaff({ ok: false, text: e.message }); });
+      .catch(function (e) {
+        vStaff({ ok: false, text: e.message, se: el('se').value, sc: el('sc').value });
+        if (el('sc')) el('sc').focus();
+      });
   };
   if (nb) el('bbtn').onclick = function () {
     busy(el('bbtn'), api('staff.bootstrap',
       { email: el('be').value, name: el('bn').value, code: el('bc').value }))
       .then(function (d) { saveAuth(d.token, d.user); location.hash = '#admin'; })
-      .catch(function (e) { vStaff({ ok: false, text: e.message }); });
+      .catch(function (e) {
+        vStaff({ ok: false, text: e.message,
+                 be: el('be').value, bn: el('bn').value, bc: el('bc').value });
+      });
   };
 }
 function vVet(tab) {
