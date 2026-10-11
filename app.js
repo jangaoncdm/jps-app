@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.7.1-M6 b021
+/* JPS app.js — BUILD JPS v0.7.1-M6 b022
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.7.1-M6 b021';
+var BUILD = 'JPS v0.7.1-M6 b022';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', ic:'cow' }, { v:'buffalo', te:'గేదె', en:'Buffalo', ic:'buffalo' },
@@ -1505,7 +1505,9 @@ function vTicket(ticket) {
         ['GP / Mandal', val((own.gp || r.gp || '') + (own.mandal || r.mandal
           ? ' / ' + (own.mandal || r.mandal) : ''))],
         ['Mobile', val(own.phone || (r.farmer && r.farmer.phone))],
-        ['Owner ID', val(own.id)]
+        // a raw UUID is unreadable on paper: print a short stable reference derived
+        // from it, which is enough for the office to find the owner row
+        ['Owner ID', own.id ? esc('JPS-F-' + String(own.id).replace(/-/g, '').slice(0, 8).toUpperCase()) : NR]
       ]) + '</div>';
       var animalB = '<div>' + H('ANIMAL', 'పశువు') + kv([
         ['Species', val(spLabel(ani.species || r.species))],
@@ -2150,6 +2152,14 @@ function wireRxPrint() {
       var root = document.documentElement;
       if (size === 'a4') root.removeAttribute('data-rx');
       else root.setAttribute('data-rx', size);
+      root.setAttribute('data-rxonly', '1');
+      var clear = function () {
+        root.removeAttribute('data-rxonly');
+        root.removeAttribute('data-rx');
+      };
+      // onafterprint is not reliable on every WebView, so clear on a timer as well
+      if ('onafterprint' in window) window.addEventListener('afterprint', clear, { once: true });
+      setTimeout(clear, 4000);
       window.print();
     };
   });

@@ -473,6 +473,11 @@ nav.tabbar[hidden]{display:none}
   /* a phone scanning a printed sheet needs real millimetres, not CSS pixels */
   .rxdoc .qr{float:right;margin:0 0 3pt 5pt;width:24mm;height:24mm}
   .rxdoc .none{font-style:italic}
+  /* Printing from the slip prints the slip. Without this the ticket card, the status
+     badges and the whole progress timeline came out around the prescription, which is
+     not what a dispensary files. Ctrl+P on the case screen still prints the screen. */
+  html[data-rxonly] #view > *{display:none!important}
+  html[data-rxonly] #view > .rxdoc{display:block!important}
   .rxpage{page-break-after:always}
   .rxpage:last-child{page-break-after:auto}
 }
