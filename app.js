@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.7.1-M6 b013
+/* JPS app.js — BUILD JPS v0.7.1-M6 b014
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.7.1-M6 b013';
+var BUILD = 'JPS v0.7.1-M6 b014';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', ic:'cow' }, { v:'buffalo', te:'గేదె', en:'Buffalo', ic:'buffalo' },
@@ -1009,6 +1009,7 @@ function vNew(want) {
         : '<input id="tg" type="text" maxlength="20" inputmode="numeric">') +
       '<div class="rowline"><button class="btn small ghost" id="loc">' + icon('pin') + ' ' +
         esc(T('నా లొకేషన్ జోడించు', 'Attach my location')) + '</button><span class="hint" id="locst"></span></div>' +
+      '<div class="locneed" id="locneed" hidden></div>' +
       '<div style="height:6px"></div>' +
       '<label class="emg"><input id="em" type="checkbox"><span><b>' + esc(T('అత్యవసరం', 'Emergency')) + '</b><br>' +
       '<span class="hint">' + esc(T('ఈత కష్టం / తీవ్ర గాయం / విషాహారం', 'Difficult delivery / severe injury / poisoning')) + '</span></span></label>' +
@@ -1021,15 +1022,26 @@ function vNew(want) {
         t.classList.toggle('on', t.querySelector('input').checked);
       });
     });
+    var locNeed = function () {
+      var need = el('em').checked && !farmPos.lat;
+      el('locneed').hidden = !need;
+      if (need) {
+        el('locneed').textContent = T(
+          'అత్యవసరం — డాక్టర్ నేరుగా రావాలి. పై బటన్ నొక్కి లొకేషన్ జోడించండి.',
+          'Emergency — the doctor has to reach this farm. Tap the button above to attach your location.');
+      }
+    };
     var svcInfo = function () {
       var svc = M.services.find(function (x) { return x.code === el('svc').value; });
       if (svc && svc.emergency) el('em').checked = true;
+      locNeed();
       el('svcinfo').innerHTML = svc
         ? '<p class="hint">' + (svc.emergency ? '<span class="dot red"></span>' : '') +
           esc(T('లక్ష్య స్పందన', 'Target response')) + ': ' +
           esc(svc.sla_raw || (svc.sla_min + ' min')) + '</p>' : '';
     };
     el('svc').onchange = svcInfo;
+    el('em').onchange = locNeed;
     if (wantCode) svcInfo();
 
     if (!known) {
@@ -1051,14 +1063,39 @@ function vNew(want) {
       if (other) { el('tg').value = ''; el('tg').focus(); }
     };
 
-    el('loc').onclick = function () {
-      el('locst').textContent = '…';
-      if (!navigator.geolocation) { el('locst').textContent = T('లొకేషన్ అందుబాటులో లేదు', 'Location unavailable'); return; }
+    // Geolocation fails in three different ways on a village phone and the farmer
+    // can only act on one of them, so each gets its own line. A high-accuracy fix
+    // needs the GPS radio and routinely times out indoors or under cloud; dropping
+    // to the coarse network fix is what makes this button work there at all.
+    var locSay = function (cls, txt) {
+      el('locst').className = 'hint' + (cls ? ' ' + cls : '');
+      el('locst').textContent = txt;
+    };
+    var locTry = function (hi) {
+      locSay('', T('చూస్తున్నాం…', 'Locating…'));
       navigator.geolocation.getCurrentPosition(function (pos) {
-        farmPos.lat = pos.coords.latitude.toFixed(6); farmPos.lng = pos.coords.longitude.toFixed(6);
-        el('locst').textContent = '✓ ' + farmPos.lat + ', ' + farmPos.lng;
-      }, function () { el('locst').textContent = T('లొకేషన్ దొరకలేదు', 'Could not get location'); },
-      { enableHighAccuracy: true, timeout: 10000 });
+        farmPos.lat = pos.coords.latitude.toFixed(6);
+        farmPos.lng = pos.coords.longitude.toFixed(6);
+        var acc = Math.round(pos.coords.accuracy || 0);
+        locSay('locok', '✓ ' + T('లొకేషన్ జోడించారు', 'Location attached') +
+          (acc ? ' (±' + acc + 'm)' : ''));
+        el('loc').innerHTML = icon('pin') + ' ' + esc(T('మళ్లీ తీసుకో', 'Update location'));
+        locNeed();
+      }, function (e) {
+        if (hi && e && e.code === 3) return locTry(false);   // TIMEOUT -> coarse fix
+        locSay('locbad', e && e.code === 1
+          ? T('అనుమతి నిరాకరించారు — సెట్టింగ్స్‌లో లొకేషన్ అనుమతి ఇవ్వండి',
+              'Permission denied — allow Location for this app in phone Settings')
+          : T('లొకేషన్ దొరకలేదు — GPS ఆన్ చేసి మళ్లీ నొక్కండి',
+              'No fix — turn GPS on and tap again'));
+      }, hi ? { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+            : { enableHighAccuracy: false, timeout: 20000, maximumAge: 300000 });
+    };
+    el('loc').onclick = function () {
+      if (!navigator.geolocation) {
+        return locSay('locbad', T('ఈ ఫోన్‌లో లొకేషన్ సౌకర్యం లేదు', 'This phone cannot share location'));
+      }
+      locTry(true);
     };
 
     el('go').onclick = function () {
