@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.7.1-M6 b020
+/* JPS app.js — BUILD JPS v0.7.1-M6 b021
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.7.1-M6 b020';
+var BUILD = 'JPS v0.7.1-M6 b021';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', ic:'cow' }, { v:'buffalo', te:'గేదె', en:'Buffalo', ic:'buffalo' },
@@ -1329,6 +1329,90 @@ function vNew(want) {
     };
   }).catch(function (e) { if (e.code === 'auth') return logout(); render(errBox(e)); });
 }
+/* Public verification. Reached by scanning the QR on a printed prescription, or by
+   typing the number. No session: a shopkeeper being handed a slip, or a district
+   officer auditing one, must be able to check it without an account. The owner's
+   mobile arrives already masked and no address is returned (see Api.gs rx.verify). */
+function vVerify(no) {
+  no = decodeURIComponent(String(no || '')).trim();
+  // the QR carries number-hash; the hash is a checksum for the server, not a lookup key
+  var dash = no.lastIndexOf('-');
+  if (dash > 0 && /^[0-9a-f]{16}$/.test(no.slice(dash + 1))) no = no.slice(0, dash);
+
+  var form = '<div class="card"><label for="vno">' +
+      TL('చీటీ నంబర్', 'Prescription number') + '</label>' +
+      '<input id="vno" type="text" autocapitalize="characters" placeholder="JPS-RX-2026-000001" value="' +
+        esc(no) + '">' +
+      '<div style="height:12px"></div>' +
+      '<button class="btn" id="vgo">' + icon('search') + ' ' +
+        esc(T('ధృవీకరించు', 'Verify')) + '</button></div>';
+
+  var paint = function (body) {
+    render('<h1>' + TL('చీటీ ధృవీకరణ', 'Verify a prescription') + '</h1>' +
+      '<p class="hint" style="margin:6px 0 13px">' +
+        esc(T('ప్రింట్ చేసిన చీటీపై ఉన్న నంబర్ లేదా QR కోడ్ ద్వారా.',
+              'By the number printed on the slip, or its QR code.')) + '</p>' +
+      form + (body || '') +
+      '<p class="hint" style="text-align:center"><a href="' + esc(homeHash()) + '">← ' +
+        esc(T('వెనుకకు', 'Back')) + '</a></p>');
+    el('vgo').onclick = function () {
+      var v = String(el('vno').value || '').trim();
+      if (v) location.hash = '#v/' + encodeURIComponent(v);
+      else vVerify('');
+    };
+  };
+
+  if (!no) return paint('');
+  paint('<div class="card"><p class="hint">' + esc(T('చూస్తున్నాం…', 'Checking…')) + '</p></div>');
+
+  vapi('rx.verify', { rx_no: no }).then(function (d) {
+    var ok = d.hash_ok;
+    var meds = (d.meds || []).length
+      ? '<table class="rxl"><thead><tr><th>#</th><th>Drug</th><th>Strength</th>' +
+        '<th>Frequency</th><th>Duration</th></tr></thead><tbody>' +
+        d.meds.map(function (m, i) {
+          return '<tr><td>' + (i + 1) + '</td><td>' + esc(m.name || '') + '</td><td>' +
+            esc(m.strength || '-') + '</td><td>' + esc(m.freq || '-') + '</td><td>' +
+            (m.days ? esc(m.days) + ' d' : '-') + '</td></tr>';
+        }).join('') + '</tbody></table>'
+      : '<p class="hint">' + esc(T('మందులు నమోదు కాలేదు', 'No medicines recorded')) + '</p>';
+
+    var wd = d.withdrawal || {};
+    var wdLine = (wd.milk_until || wd.meat_until)
+      ? '<div class="wdbox">' +
+          (wd.milk_until ? '<div><b>Milk</b>: ' + esc(T('వరకు', 'up to')) + ' ' +
+            esc(wd.milk_until) + ', ' + esc(T('నుంచి వాడవచ్చు', 'usable from')) + ' ' +
+            esc(wd.milk_from) + '</div>' : '') +
+          (wd.meat_until ? '<div><b>Meat</b>: ' + esc(T('వరకు', 'up to')) + ' ' +
+            esc(wd.meat_until) + '</div>' : '') +
+        '</div>'
+      : '';
+
+    paint('<div class="card rxdoc">' +
+      '<div class="' + (ok ? 'ok' : 'err') + '">' +
+        (ok ? icon('check') + ' ' + esc(T('ఈ చీటీ నిజమైనది, మార్చబడలేదు',
+                'Genuine and unaltered'))
+            : icon('warn') + ' ' + esc(T('ఈ చీటీ మారి ఉంది — కార్యాలయాన్ని సంప్రదించండి',
+                'Content does not match its signature. Contact the office.'))) + '</div>' +
+      '<div class="rxs">' + '<div class="kv">' +
+        '<b>Prescription No</b><span>' + esc(d.rx_no) + '</span>' +
+        '<b>Issued</b><span>' + esc(d.issued_at) + ' IST</span>' +
+        '<b>Status</b><span>' + esc(d.status) + ' (v' + esc(d.version) + ')</span>' +
+        '<b>Doctor</b><span>' + esc(drName(d.doctor.name)) +
+          (d.doctor.reg ? ' · ' + esc(d.doctor.reg) : '') + '</span>' +
+        '<b>Institution</b><span>' + esc(d.doctor.facility || '-') + '</span>' +
+        '<b>Animal</b><span>' + esc(spLabel((d.animal || {}).species || '')) + '</span>' +
+        '<b>Owner</b><span>' + esc(d.owner_masked || '-') + '</span>' +
+      '</div></div>' +
+      '<div class="rxs"><h4>Rx</h4>' + meds + '</div>' +
+      (wdLine ? '<div class="rxs"><h4>' +
+        esc('WITHDRAWAL | పాలు, మాంసం') + '</h4>' + wdLine + '</div>' : '') +
+      '</div>');
+  }).catch(function (e) {
+    paint(errBox(e));
+  });
+}
+
 function vTicket(ticket) {
   loading(3);
   var staff = S.user && S.user.role !== 'farmer';
@@ -1361,87 +1445,178 @@ function vTicket(ticket) {
       ? '<div class="card"><h2>' + icon('vet') + ' ' + TL('డాక్టర్ నివేదిక', "Doctor's report") + '</h2>' +
         '<p>' + esc(r.diagnosis) + '</p>' +
         (r.vet ? '<p class="hint">— ' + esc(r.vet.name) + '</p>' : '') + '</div>' : '';
+    /* The printed veterinary prescription. Section order, bilingual labels and the
+       "Not recorded" placeholders are fixed by the district specification, so the
+       sheet looks the same whichever doctor signs it and whichever section is empty.
+       Drug names stay in English on purpose: that is how they appear on the vial. */
     var rx = (r.prescriptions || []).map(function (p) {
-      // Laid out the way an Apollo/Practo e-prescription is: letterhead, prescriber with
-      // council number, patient block, Rx table, advice, then the withdrawal notice -
-      // the one block an Indian veterinary slip carries that a human one does not.
+      var snap = p.snap || {};
+      var doc = snap.doctor || {}, own = snap.owner || {},
+          ani = snap.animal || {}, vis = snap.visit || {};
+      var dates = p.dates || {};
+      var NR = '<span class="none">' + esc(T('నమోదు కాలేదు', 'Not recorded')) + '</span>';
+      // every field prints, empty or not, so the layout never shifts between slips
+      var val = function (v) {
+        return (v || v === 0) && String(v).trim() ? esc(String(v)) : NR;
+      };
+      // section headings are English | Telugu, per the specification
+      var H = function (en, te) { return '<h4>' + esc(en + ' | ' + te) + '</h4>'; };
+      var kv = function (rows) {
+        return '<div class="kv">' + rows.map(function (x) {
+          return '<b>' + esc(x[0]) + '</b><span>' + x[1] + '</span>';
+        }).join('') + '</div>';
+      };
+
+      // ---- 2. identity, with the QR a verifier scans
+      var base = location.origin + location.pathname.replace(/[^/]*$/, '');
+      var vUrl = base + '#v/' + (p.rx_no || '');
+      var qr = (typeof qrSvg === 'function' && p.rx_no)
+        ? qrSvg(vUrl + (p.rx_hash ? '-' + p.rx_hash : ''), { size: 110, cls: 'qr' }) : '';
+
       var head =
-        '<div class="rxhead">' +
-          '<div class="rxdept">' + esc(T('పశుసంవర్ధక శాఖ', 'Veterinary & Animal Husbandry Dept')) +
-            ' · ' + esc(T('జనగామ జిల్లా', 'Jangaon District')) + '</div>' +
-          (p.facility_name ? '<div class="rxfac">' + esc(p.facility_name) + '</div>' : '') +
-          '<div class="rxdoc"><span>' + esc(drName(p.doctor_name)) + '</span>' +
-            (p.doctor_reg ? '<span class="rxreg">Reg. ' + esc(p.doctor_reg) + '</span>' : '') + '</div>' +
+        '<div class="rxhd">' +
+          '<div class="gov">GOVERNMENT OF TELANGANA &nbsp;|&nbsp; ANIMAL HUSBANDRY DEPARTMENT</div>' +
+          '<div class="inst">' + val(p.facility_name || doc.facility) +
+            ' &nbsp;|&nbsp; Jangaon District</div>' +
+          '<div class="inst">JANGAON PASHU SEVA | జనగామ పశు సేవ</div>' +
+          '<div class="ttl">VETERINARY PRESCRIPTION | పశు వైద్య చీటీ</div>' +
+          '<div class="only">For veterinary use only</div>' +
         '</div>';
 
-      var pt = [];
-      pt.push(['<b>' + esc(T('యజమాని', 'Owner')) + '</b>', esc((r.farmer && r.farmer.name) || (S.user && S.user.name) || '')]);
-      pt.push(['<b>' + esc(T('జంతువు', 'Animal')) + '</b>', esc(spLabel(r.species)) + (r.pashu_tag ? ' · Tag ' + esc(r.pashu_tag) : '')]);
-      if (p.weight_kg) pt.push(['<b>' + esc(T('బరువు', 'Weight')) + '</b>', esc(p.weight_kg) + ' kg']);
-      if (p.temp_c) pt.push(['<b>' + esc(T('ఉష్ణోగ్రత', 'Temp')) + '</b>', esc(p.temp_c) + ' °C']);
-      var ptBlock = '<div class="rxpt">' + pt.map(function (x) {
-        return '<div><span>' + x[0] + '</span><span>' + x[1] + '</span></div>'; }).join('') + '</div>';
+      var ident = '<div class="rxs">' + qr + kv([
+        ['Prescription No', val(p.rx_no)],
+        ['Date / Time', val(p.at) + ' IST'],
+        ['Request ID', val(r.ticket)],
+        ['Visit', (vis.emergency ? 'Emergency' : 'Routine') + ', ' + (vis.mode || 'Teleconsultation')]
+      ]) + '<div style="clear:both"></div></div>';
 
-      var meds = (p.meds || []).length
-        ? '<table class="rxtab"><thead><tr><th>#</th><th>' + esc(T('మందు', 'Medicine')) + '</th>' +
-            '<th>' + esc(T('మోతాదు', 'Dosage')) + '</th></tr></thead><tbody>' +
-          p.meds.map(function (m, i) {
-            var fq = DOSE_FREQ.filter(function (f) { return f.v === m.freq; })[0];
-            var tm = DOSE_TIMING.filter(function (t) { return t.v === m.timing; })[0];
-            return '<tr><td class="rxn">' + (i + 1) + '</td>' +
-              '<td><b>' + esc(m.name) + '</b>' +
-                (m.strength ? '<div class="rxsub">' + esc(m.strength) +
-                  (m.route && m.route !== 'Oral' ? ' · ' + esc(m.route) : '') + '</div>' : '') +
-                (m.note ? '<div class="rxsub">' + esc(m.note) + '</div>' : '') + '</td>' +
-              '<td><b class="rxfreq">' + esc(m.freq) + '</b>' +
-                (fq ? '<div class="rxsub">' + esc(T(fq.te, fq.en)) + '</div>' : '') +
-                (m.days ? '<div class="rxsub">' + esc(m.days) + ' ' + esc(T('రోజులు', 'days')) + '</div>' : '') +
-                (tm && m.timing !== 'any' ? '<div class="rxsub">' + esc(T(tm.te, tm.en)) + '</div>' : '') +
-              '</td></tr>';
-          }).join('') + '</tbody></table>'
-        : (p.rx_text ? '<p class="rxpre">' + esc(p.rx_text) + '</p>' : '');
+      // ---- 3. veterinarian
+      var vet3 = '<div class="rxs">' + H('VETERINARIAN', 'పశువైద్యుడు') + kv([
+        ['Name', val(drName(p.doctor_name || doc.name))],
+        ['Reg. No', val(p.doctor_reg || doc.reg)],
+        ['Institution', val(p.facility_name || doc.facility)],
+        ['Mobile', val(doc.phone)]
+      ]) + '</div>';
 
-      // Food-chain safety. Loud on purpose: milk sold inside this window is a residue violation.
-      var wd = '';
+      // ---- 4 and 5. owner and animal, side by side on a wide sheet
+      var ownerB = '<div>' + H('OWNER', 'యజమాని') + kv([
+        ['Name', val(own.name || (r.farmer && r.farmer.name) || (S.user && S.user.name))],
+        ['Village', val(own.village || r.village)],
+        ['GP / Mandal', val((own.gp || r.gp || '') + (own.mandal || r.mandal
+          ? ' / ' + (own.mandal || r.mandal) : ''))],
+        ['Mobile', val(own.phone || (r.farmer && r.farmer.phone))],
+        ['Owner ID', val(own.id)]
+      ]) + '</div>';
+      var animalB = '<div>' + H('ANIMAL', 'పశువు') + kv([
+        ['Species', val(spLabel(ani.species || r.species))],
+        ['Sex / Age', NR],
+        ['Body weight', p.weight_kg ? esc(p.weight_kg) + ' kg' : NR],
+        ['Tag / UID', val(ani.tag || r.pashu_tag)],
+        ['Animals treated', '1']
+      ]) + '</div>';
+      var who = '<div class="rxs two">' + ownerB + animalB + '</div>';
+
+      // ---- 6. clinical
+      var vitals = [];
+      if (p.temp_c) vitals.push('Temp ' + p.temp_c + ' C');
+      if (p.weight_kg) vitals.push('Weight ' + p.weight_kg + ' kg');
+      var clin = '<div class="rxs">' + H('CLINICAL DETAILS', 'వైద్య వివరాలు') + kv([
+        ['Complaint', val(r.description)],
+        ['Vitals', vitals.length ? esc(vitals.join(' | ')) : NR],
+        ['Diagnosis', val(p.diagnosis || p.observation)],
+        ['Samples / Tests', val(p.tests)]
+      ]) + '</div>';
+
+      // ---- 7. the Rx table
+      var meds = p.meds || [];
+      var anyAm = false;
+      var rows = meds.map(function (m, i) {
+        var fq = DOSE_FREQ.filter(function (f) { return f.v === m.freq; })[0];
+        if (m.antimicrobial) anyAm = true;
+        return '<tr><td>' + (i + 1) + '</td>' +
+          '<td>' + esc(m.name || '') + (m.antimicrobial ? ' <span class="am">[AM]</span>' : '') + '</td>' +
+          '<td>' + esc(m.strength || '-') + '</td>' +
+          '<td>' + esc(m.route || 'Oral') + '</td>' +
+          '<td>' + esc(m.freq || '-') + (fq ? '<br>' + esc(T(fq.te, fq.en)) : '') + '</td>' +
+          '<td>' + (m.days ? esc(m.days) + ' d' : '-') + '</td>' +
+          '<td>' + esc(m.qty || '-') + '</td>' +
+          '<td>' + esc(m.note || '-') + '</td></tr>';
+      }).join('');
+      var rxTable = meds.length
+        ? '<table class="rxl"><thead><tr><th>S.No</th><th>Drug</th><th>Strength</th>' +
+          '<th>Route</th><th>Frequency</th><th>Duration</th><th>Qty</th><th>Instructions</th>' +
+          '</tr></thead><tbody>' + rows + '</tbody></table>' +
+          (anyAm ? '<div class="only">[AM] = antimicrobial</div>' : '')
+        : (p.rx_text ? '<p>' + esc(p.rx_text) + '</p>' : '<p>' + NR + '</p>');
+      var rxSec = '<div class="rxs">' + H('Rx', 'మందులు') + rxTable + '</div>';
+
+      // ---- 8. withdrawal. The one block a human prescription has no equivalent of:
+      // milk or meat sold inside this window is a residue violation.
+      var wdInner;
       if (p.withdraw_milk_h || p.withdraw_meat_d) {
-        var parts = [];
-        if (p.withdraw_milk_h) parts.push('<div><span class="wdno">' + esc(p.withdraw_milk_h) + ' ' +
-          esc(T('గంటలు', 'hours')) + '</span>' + esc(T('పాలు వాడవద్దు / అమ్మవద్దు', 'Do not use or sell milk')) + '</div>');
-        if (p.withdraw_meat_d) parts.push('<div><span class="wdno">' + esc(p.withdraw_meat_d) + ' ' +
-          esc(T('రోజులు', 'days')) + '</span>' + esc(T('మాంసానికి పంపవద్దు', 'Do not send for meat')) + '</div>');
-        wd = '<div class="rxwd"><div class="wdttl">' + icon('warn') + ' ' +
-          esc(T('ఔషధ విరమణ కాలం', 'Withdrawal period')) + '</div>' + parts.join('') +
-          '<div class="wdfoot">' + esc(T('చివరి మోతాదు నుంచి లెక్కించండి',
-            'Counted from the last dose given')) + '</div></div>';
-      } else if ((p.meds || []).length && (p.meds || []).every(function (m) { return m.wd_none; })) {
-        // cleanMed promises that "the doctor declared none is needed" can never be read as
-        // "nobody answered" — but both printed an empty slip, which is the one reading that
-        // matters for milk. Say it explicitly. wd_none rides along in meds_json already.
-        wd = '<div class="rxwd ok"><div class="wdttl">' + icon('check') + ' ' +
-          esc(T('ఔషధ విరమణ కాలం', 'Withdrawal period')) + '</div>' +
-          '<div>' + esc(T('ఈ మందులకు పాలు / మాంసం ఆపాల్సిన అవసరం లేదు — డాక్టర్ నిర్ధారించారు',
-            'No milk or meat withholding needed for these medicines — confirmed by the doctor')) +
-          '</div></div>';
+        var ws = [];
+        if (p.withdraw_milk_h) {
+          ws.push('<div><b>Milk</b>: ' + esc(T('పాలు వాడవద్దు / అమ్మవద్దు', 'Do not use or sell milk')) +
+            ' — ' + esc(p.withdraw_milk_h) + ' ' + esc(T('గంటలు', 'hours')) +
+            (dates.milk_until ? '. ' + esc(T('వరకు', 'Up to')) + ' ' + esc(dates.milk_until) +
+              '. ' + esc(T('నుంచి వాడవచ్చు', 'Usable from')) + ' ' + esc(dates.milk_from) + '.' : '') +
+            '</div>');
+        }
+        if (p.withdraw_meat_d) {
+          ws.push('<div><b>Meat</b>: ' + esc(T('మాంసానికి పంపవద్దు', 'Not for slaughter')) +
+            ' — ' + esc(p.withdraw_meat_d) + ' ' + esc(T('రోజులు', 'days')) +
+            (dates.meat_until ? '. ' + esc(T('వరకు', 'Up to')) + ' ' + esc(dates.meat_until) + '.' : '') +
+            '</div>');
+        }
+        wdInner = '<div class="wdbox">' + ws.join('') +
+          '<div class="only">' + esc(T('చివరి మోతాదు నుంచి లెక్కించండి. ఉత్పత్తి లేబుల్ ప్రకారం.',
+            'Counted from the last dose. Values are from the product labels.')) + '</div></div>';
+      } else if (meds.length && meds.every(function (m) { return m.wd_none; })) {
+        wdInner = '<div class="wdbox ok">' + esc(T(
+          'ఈ మందులకు పాలు / మాంసం ఆపాల్సిన అవసరం లేదు — డాక్టర్ నిర్ధారించారు',
+          'No milk or meat withholding needed for these medicines, confirmed by the doctor')) + '</div>';
+      } else {
+        wdInner = '<div class="wdbox">' + NR + '</div>';
       }
+      var wdSec = '<div class="rxs">' +
+        H('WITHDRAWAL PERIODS', 'పాలు, మాంసం వాడకూడని కాలం') + wdInner + '</div>';
 
-      var body = ptBlock +
-        (p.observation ? '<div class="rxsec"><h3>' + esc(T('నిర్ధారణ', 'Diagnosis')) + '</h3><p>' + esc(p.observation) + '</p></div>' : '') +
-        (meds ? '<div class="rxsec"><h3>Rx · ' + esc(T('మందులు', 'Medicines')) + '</h3>' + meds + '</div>' : '') +
-        wd +
-        (p.advice ? '<div class="rxsec"><h3>' + esc(T('సలహా', 'Advice')) + '</h3><p>' + esc(p.advice) + '</p></div>' : '') +
-        (p.tests ? '<div class="rxsec"><h3>' + esc(T('పరీక్షలు', 'Tests')) + '</h3><p>' + esc(p.tests) + '</p></div>' : '') +
-        (p.followup_date ? '<div class="rxsec"><h3>' + esc(T('మళ్లీ చూపించండి', 'Follow-up')) + '</h3><p>' + esc(p.followup_date) + '</p></div>' : '') +
-        (p.photo ? '<img class="ph" src="data:' + esc(p.photo.mime) + ';base64,' + esc(p.photo.b64) + '">' : '');
+      // ---- 9. advice
+      var adviceItems = String(p.advice || '').split(/\r?\n|(?:^|\s)\d+[.)]\s+/)
+        .map(function (x) { return x.trim(); }).filter(function (x) { return x; });
+      var advSec = '<div class="rxs">' + H('ADVICE', 'సూచనలు') +
+        (adviceItems.length
+          ? '<ol>' + adviceItems.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ol>'
+          : '<p>' + NR + '</p>') +
+        kv([['Follow-up', val(p.followup_date)]]) + '</div>';
 
-      var foot = '<div class="rxfoot">' +
-        '<div>' + esc(T('డిజిటల్‌గా జారీ చేయబడింది — సంతకం అవసరం లేదు',
-          'Issued electronically — valid without a physical signature')) + '</div>' +
-        '<div class="rxmeta"><span>' + esc(p.rx_no || '') + '</span><span>' + esc(p.at) + '</span>' +
-          '<span>' + esc(r.ticket) + '</span></div></div>';
+      // ---- 10. authentication
+      var auth = '<div class="sign">' +
+        '<div>' +
+          '<div><b>Digitally signed by</b> ' + esc(drName(p.doctor_name || doc.name)) +
+            (p.doctor_reg ? ' (' + esc(p.doctor_reg) + ')' : '') + ' on ' + esc(p.at) + ' IST</div>' +
+          '<div>' + esc(T('యజమాని అంగీకారం: మందులు అందాయి, సూచనలు తెలుగులో వివరించారు.',
+            'Owner acknowledgment: medicines received and instructions explained in Telugu.')) + '</div>' +
+          '<div>' + esc(T('సంతకం / వేలిముద్ర', 'Signature / thumb')) + ': ____________</div>' +
+          '<div class="only">' + esc(T('అత్యవసర హెల్ప్‌లైన్', 'Helpline')) + ': 1962 &nbsp;|&nbsp; ' +
+            'Generated by Jangaon Pashu Seva ' + esc(BUILD) + '</div>' +
+          '<div class="only">Verify: ' + esc(vUrl) +
+            (p.rx_hash ? ' &nbsp;|&nbsp; Hash: ' + esc(p.rx_hash) : '') + '</div>' +
+        '</div>' +
+        '<div class="stamp">' + esc(T('ముద్ర', 'Stamp')) + '</div>' +
+      '</div>';
 
-      return '<div class="card rxcard">' + head + body + foot +
-        '<div class="rowline"><button class="btn small ghost" onclick="window.print()">' + icon('print') + ' ' +
-        esc(T('ప్రింట్ / సేవ్', 'Print / save')) + '</button></div></div>';
+      var controls = '<div class="rowline noprint" style="margin-top:11px">' +
+        '<button class="btn small ghost" data-rxp="a4">' + icon('print') + ' A4</button>' +
+        '<button class="btn small ghost" data-rxp="a5">A5</button>' +
+        '<button class="btn small ghost" data-rxp="thermal">80 mm</button>' +
+        '<a class="btn small ghost" href="#v/' + esc(p.rx_no || '') + '">' + icon('search') + ' ' +
+          esc(T('ధృవీకరించు', 'Verify')) + '</a></div>';
+
+      return '<div class="rxdoc rxpage">' + head + ident + vet3 + who + clin +
+        rxSec + wdSec + advSec + auth + controls +
+        (p.photo ? '<img class="ph noprint" src="data:' + esc(p.photo.mime) +
+          ';base64,' + esc(p.photo.b64) + '">' : '') + '</div>';
     }).join('');
     var svcLine = r.service ? '<p>' + esc(T(r.service.te, r.service.en)) + ' <span class="hint">(' + esc(r.service.code) + ')</span></p>' : '';
     var caseOpen = r.status === 'ASSIGNED' || r.status === 'VISIT_SCHEDULED';
@@ -1569,6 +1744,7 @@ function vTicket(ticket) {
         };
       });
     }
+    wireRxPrint();
     startPoll(function () { if (location.hash === '#t/' + ticket) vTicket(ticket); });
   }).catch(function (e) { if (e.code === 'auth') return logout(); render(errBox(e)); });
 }
@@ -1965,7 +2141,24 @@ function vTips() {
       '<span><b>' + esc(T('అత్యవసరమా? 1962', 'Emergency? Call 1962')) + '</b>' +
       '<span class="hint">' + esc(T('24 గంటలూ ఉచిత', 'Free, 24 hours')) + '</span></span></a>');
 }
+/* The three print sizes the dispensary uses. data-rx drives the @page rules in
+   index.html; it is cleared after printing so the next print starts at A4. */
+function wireRxPrint() {
+  Array.prototype.forEach.call(document.querySelectorAll('[data-rxp]'), function (b) {
+    b.onclick = function () {
+      var size = b.getAttribute('data-rxp');
+      var root = document.documentElement;
+      if (size === 'a4') root.removeAttribute('data-rx');
+      else root.setAttribute('data-rx', size);
+      window.print();
+    };
+  });
+}
+
 function staffNav(cur) {
+  // A vet's five destinations are all in the bottom bar now, so the rail would only
+  // repeat them. Only an admin, with seven, still needs it for the overflow.
+  if (!(S.user && S.user.role === 'admin')) return '';
   var items = [['#vet', 'Queue'], ['#att', 'Attendance'], ['#leave', 'Leave'],
                ['#stock', 'Stock'], ['#issues', 'Issues']];
   if (S.user && S.user.role === 'admin') {
@@ -2554,11 +2747,12 @@ function vAdmin() {
 function paintTabs() {
   var bar = el('tabbar');
   if (!bar) return;
-  var farmer = S.user && S.user.role === 'farmer' && S.token;
-  bar.hidden = !farmer;
+  var signedIn = S.user && S.token;
+  var farmer = signedIn && S.user.role === 'farmer';
+  var staff = signedIn && !farmer;
+  bar.hidden = !signedIn;
   document.body.className = farmer ? '' : 'staff';
-  if (!farmer) return;
-  var h = location.hash || '#home';
+  var h = location.hash || (farmer ? '#home' : '');
   var tab = function (href, glyph, te, en, cls) {
     var on = (href === '#home' && (h === '#home' || h === ''))
       || (href !== '#home' && h.indexOf(href) === 0);
@@ -2568,6 +2762,24 @@ function paintTabs() {
       '<span class="ic">' + glyph + '</span><span class="tx">' +
       esc(S.lang === 'en' ? en : te) + '</span></a>';
   };
+  if (staff) {
+    // The same bottom bar the user app has. A vet's five destinations fit exactly, so
+    // staffNav() stops rendering its top rail for them and the screen gets that height
+    // back. An admin has seven, so the rail stays as the overflow for the two that do
+    // not fit here. Staff screens may be English-only (invariant 3).
+    bar.innerHTML = S.user.role === 'admin'
+      ? tab('#admin', icon('chart'), 'Dashboard', 'Dashboard') +
+        tab('#vet', icon('cases'), 'Queue', 'Queue') +
+        tab('#att', icon('check'), 'Attendance', 'Attendance') +
+        tab('#issues', icon('warn'), 'Issues', 'Issues') +
+        tab('#bcast', icon('megaphone'), 'Notices', 'Notices')
+      : tab('#vet', icon('cases'), 'Queue', 'Queue') +
+        tab('#att', icon('check'), 'Attendance', 'Attendance') +
+        tab('#leave', icon('calendar'), 'Leave', 'Leave') +
+        tab('#stock', icon('pill'), 'Stock', 'Stock') +
+        tab('#issues', icon('warn'), 'Issues', 'Issues');
+    return;
+  }
   bar.innerHTML =
     tab('#home', icon('home'), '\u0c39\u0c4b\u0c2e\u0c4d', 'Home') +
     tab('#cases', icon('cases'), '\u0c15\u0c47\u0c38\u0c41\u0c32\u0c41', 'Cases') +
@@ -2604,6 +2816,7 @@ function route() {
   // Boot pushes '#home' onto the bare URL, so Back lands on the empty hash. Without this
   // a signed-in user was shown the sign-in screen by pressing Back once.
   if (!h || h === '#') h = homeHash();
+  if (h.indexOf('#v/') === 0) return vVerify(h.slice(3));
   if (h.indexOf('#t/') === 0) return vTicket(h.slice(3));
   if (h === '#staff') return vStaff();
   if (h === '#vet') return vVet();
@@ -2700,7 +2913,10 @@ function boot() {
       dismissSplash();
       tryRegisterPush();
     } else {
-      location.hash = location.hash === '#staff' ? '#staff' : '#identify';
+      // a QR scan lands on #v/<number> with no session, and verification is public,
+      // so keep the deep link instead of bouncing the scanner to sign-in
+      var h0 = location.hash || '';
+      location.hash = (h0 === '#staff' || h0.indexOf('#v/') === 0) ? h0 : '#identify';
       route();
       dismissSplash();
     }
