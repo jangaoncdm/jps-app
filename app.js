@@ -1,10 +1,10 @@
-/* JPS app.js — BUILD JPS v0.7.1-M6 b018
+/* JPS app.js — BUILD JPS v0.7.1-M6 b019
  * Set API_URL to the Apps Script /exec deployment URL. POSTs go as text/plain
  * (GAS cannot answer CORS preflights; text/plain avoids one; body still arrives in postData).
  */
 'use strict';
 var API_URL = 'https://script.google.com/macros/s/AKfycbzoft5NDa9cSsR7QexjilMA_Uv2FWujkJqaWnYTLn8yY32pSit1EuQ5iBxS1nRJHR4b2g/exec';
-var BUILD = 'JPS v0.7.1-M6 b018';
+var BUILD = 'JPS v0.7.1-M6 b019';
 
 var SPECIES = [
   { v:'cow', te:'ఆవు', en:'Cow', ic:'cow' }, { v:'buffalo', te:'గేదె', en:'Buffalo', ic:'buffalo' },
@@ -163,6 +163,20 @@ function errBox(e) {
   var en = (e.message || '').trim();
   return '<div class="err">' + esc(te) +
     (S.lang === 'te' || !en ? '' : '<span class="en">' + esc(en) + '</span>') + '</div>';
+}
+
+/* QA-006. alert() was the error path on ten handlers. It shows the raw English backend
+   message, blocks the thread, bypasses errBox()'s Telugu mapping, and some Android
+   WebViews suppress it outright, which made a failed save look like a success. Render
+   into whichever message slot the current screen has, or above the view if it has none. */
+function showErr(e) {
+  var box = el('msg') || el('pmsg') || el('codebox');
+  if (box) box.innerHTML = errBox(e);
+  else {
+    var v = el('view');
+    if (v) v.insertAdjacentHTML('afterbegin', errBox(e));
+  }
+  window.scrollTo(0, 0);
 }
 
 function TL(te, en) { // label HTML: Telugu with a small English line in 'both'
@@ -557,9 +571,9 @@ function vIdentify(msg) {
       '<button class="btn" id="hintbtn">' + icon('mobile') + ' ' +
         esc(T('నా నంబర్‌తో కొనసాగండి', 'Continue with my number')) + '</button>' +
       '<div class="orline"><span>' + esc(T('లేదా', 'or')) + '</span></div>' +
-      '<label style="margin-top:0">' + TL('మొబైల్ నంబర్', 'Mobile number') + '</label>' +
+      '<label for="ph" style="margin-top:0">' + TL('మొబైల్ నంబర్', 'Mobile number') + '</label>' +
       '<input id="ph" type="tel" inputmode="numeric" placeholder="9XXXXXXXXX">' +
-      '<label>' + TL('మీ పేరు', 'Your name') + '</label>' +
+      '<label for="nm">' + TL('మీ పేరు', 'Your name') + '</label>' +
       '<input id="nm" type="text" maxlength="80">' +
       '<div style="height:14px"></div>' +
       '<button class="btn ghost" id="manbtn">' + esc(T('కొనసాగండి', 'Continue')) + '</button>' +
@@ -1001,15 +1015,15 @@ function paintProfile(data) {
     '<div id="pmsg"></div>' +
 
     '<div class="card"><h2>' + TL('మీ వివరాలు', 'Your details') + '</h2>' +
-      '<label style="margin-top:0">' + TL('పేరు', 'Name') + '</label>' +
+      '<label for="pnm" style="margin-top:0">' + TL('పేరు', 'Name') + '</label>' +
       '<input id="pnm" maxlength="80" value="' + esc(u.name || '') + '">' +
-      '<label>' + TL('మండలం', 'Mandal') + '</label>' +
+      '<label for="pmd">' + TL('మండలం', 'Mandal') + '</label>' +
       '<select id="pmd"><option value="">—</option>' + mOpts + '</select>' +
-      '<label>' + TL('గ్రామ పంచాయతీ', 'Gram Panchayat') + '</label>' +
+      '<label for="pgp">' + TL('గ్రామ పంచాయతీ', 'Gram Panchayat') + '</label>' +
       '<select id="pgp"><option value="">—</option></select>' +
-      '<label>' + TL('గ్రామం / నివాసం', 'Village / habitation') + '</label>' +
+      '<label for="pvg">' + TL('గ్రామం / నివాసం', 'Village / habitation') + '</label>' +
       '<input id="pvg" maxlength="80" value="' + esc(u.village || '') + '">' +
-      '<label>' + TL('దీర్ఘకాలిక సమస్యలు', 'Long-running problems') + '</label>' +
+      '<label for="pch">' + TL('దీర్ఘకాలిక సమస్యలు', 'Long-running problems') + '</label>' +
       '<textarea id="pch" maxlength="300" placeholder="' +
         esc(T('ఉదా: పాత ఆవులలో మళ్లీ మళ్లీ పొదుగు వాపు',
           'e.g. recurring mastitis in the older cows')) + '"></textarea>' +
@@ -1025,10 +1039,13 @@ function paintProfile(data) {
         '<p class="hint">' + esc(T('అభ్యర్థన పంపకుండానే ఇక్కడ పశువులను చేర్చవచ్చు',
           'Add your animals here. You do not have to file a request to do it.')) + '</p>') + '</div>' +
       '<div class="arow addrow">' +
-        '<select id="asp">' + spOpts + '</select>' +
-        '<input id="aag" type="number" min="0" max="40" step="0.5" placeholder="' +
+        '<select id="asp" aria-label="' + esc(T('జంతువు రకం', 'Animal type')) + '">' +
+          spOpts + '</select>' +
+        '<input id="aag" type="number" min="0" max="40" step="0.5" aria-label="' +
+          esc(T('వయస్సు సంవత్సరాలలో', 'Age in years')) + '" placeholder="' +
           esc(T('వయస్సు', 'Age')) + '">' +
-        '<input id="atg" maxlength="20" inputmode="numeric" placeholder="' +
+        '<input id="atg" maxlength="20" inputmode="numeric" aria-label="' +
+          esc(T('చెవి ట్యాగ్ నంబర్', 'Ear tag number')) + '" placeholder="' +
           esc(T('ట్యాగ్', 'Tag')) + '">' +
       '</div>' +
       '<button class="btn ghost small" id="aadd" style="margin-top:9px">+ ' +
@@ -1141,14 +1158,14 @@ function vNew(want) {
             '<div class="en">' + esc([u.gp || u.village, mName].filter(Boolean).join(', ')) + '</div></div>' +
           '<a href="#profile" class="chg">' + esc(T('మార్చండి', 'Change')) + '</a>' +
         '</div>'
-      : '<label>' + TL('మండలం', 'Mandal') + '</label>' +
+      : '<label for="md">' + TL('మండలం', 'Mandal') + '</label>' +
         '<select id="md"><option value="">— ' + esc(T('ఎంచుకోండి', 'Select')) + ' —</option>' + md + '</select>' +
-        '<label>' + TL('గ్రామ పంచాయతీ', 'Gram Panchayat') + '</label>' +
+        '<label for="gp">' + TL('గ్రామ పంచాయతీ', 'Gram Panchayat') + '</label>' +
         '<select id="gp" disabled><option value="">— ' +
           esc(T('ముందు మండలం ఎంచుకోండి', 'Pick mandal first')) + ' —</option></select>' +
-        '<label>' + TL('గ్రామం / నివాసం', 'Village / habitation') + '</label>' +
+        '<label for="vg">' + TL('గ్రామం / నివాసం', 'Village / habitation') + '</label>' +
         '<input id="vg" type="text" maxlength="80" value="' + esc(u.village || '') + '">' +
-        '<label>' + TL('మీ పేరు', 'Your name') + '</label>' +
+        '<label for="nm">' + TL('మీ పేరు', 'Your name') + '</label>' +
         '<input id="nm" type="text" maxlength="80" value="' + esc(u.name || '') + '">' +
         '<p class="hint">' + esc(T('ఒక్కసారి మాత్రమే — తర్వాత గుర్తుంచుకుంటాం',
           'Asked once. We remember it for next time.')) + '</p>';
@@ -1166,19 +1183,21 @@ function vNew(want) {
       '<div id="msg"></div>' +
       whereBlock +
       '<label>' + TL('ఏ జంతువు?', 'Which animal?') + '</label><div class="tiles" id="tiles">' + tiles + '</div>' +
-      '<label>' + TL('సమస్య / సేవ', 'Problem / service') + '</label>' +
+      '<label for="svc">' + TL('సమస్య / సేవ', 'Problem / service') + '</label>' +
       '<select id="svc"><option value="">— ' + esc(T('ఎంచుకోండి', 'Select')) + ' —</option>' + svcOpts + '</select>' +
       '<div id="svcinfo"></div>' +
-      '<label>' + TL('వివరాలు', 'Details (optional)') + '</label>' +
+      '<label for="ds">' + TL('వివరాలు', 'Details (optional)') + '</label>' +
       '<textarea id="ds" maxlength="1000" placeholder="' + esc(T('ఎప్పటి నుంచి? ఏమి గమనించారు?', 'Since when? What did you notice?')) + '"></textarea>' +
-      '<label>' + TL('ఫోటో', 'Photo (optional)') + '</label>' +
+      '<label for="pf">' + TL('ఫోటో', 'Photo (optional)') + '</label>' +
       '<input id="pf" type="file" accept="image/*" capture="environment">' +
-      '<label>' + TL('చెవి ట్యాగ్ నంబర్', 'Ear-tag no. (optional)') + '</label>' +
+      '<label for="tgsel">' + TL('చెవి ట్యాగ్ నంబర్', 'Ear-tag no. (optional)') + '</label>' +
       (tagOpts
         ? '<select id="tgsel"><option value="">— ' + esc(T('ఎంచుకోండి', 'Select')) + ' —</option>' +
             tagOpts + '<option value="__new">+ ' + esc(T('వేరే ట్యాగ్', 'Another tag')) + '</option></select>' +
-          '<input id="tg" type="text" maxlength="20" inputmode="numeric" hidden>'
-        : '<input id="tg" type="text" maxlength="20" inputmode="numeric">') +
+          '<input id="tg" type="text" maxlength="20" inputmode="numeric" hidden'
+          + ' aria-label="' + esc(T('వేరే చెవి ట్యాగ్ నంబర్', 'Other ear tag number')) + '">'
+        : '<input id="tg" type="text" maxlength="20" inputmode="numeric"'
+          + ' aria-label="' + esc(T('చెవి ట్యాగ్ నంబర్', 'Ear tag number')) + '">') +
       '<div class="rowline"><button class="btn small ghost" id="loc">' + icon('pin') + ' ' +
         esc(T('నా లొకేషన్ జోడించు', 'Attach my location')) + '</button><span class="hint" id="locst"></span></div>' +
       '<div class="locneed" id="locneed" hidden></div>' +
@@ -1188,6 +1207,9 @@ function vNew(want) {
       '<div class="stickycta"><button class="btn" id="go">' + esc(T('అభ్యర్థన పంపండి', 'Submit request')) + '</button></div>' +
       '<div style="height:8px"></div><a class="btn ghost" href="#home">← ' + esc(T('వెనుకకు', 'Back')) + '</a></div>');
 
+    // QA-001: minted once per form, not per attempt, so api()'s automatic resend of an
+    // unparseable reply carries the same id and the backend returns the first ticket.
+    var reqId = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
     var farmPos = { lat: '', lng: '' };
     el('tiles').addEventListener('change', function () {
       Array.prototype.forEach.call(document.querySelectorAll('.tile'), function (t) {
@@ -1284,6 +1306,7 @@ function vNew(want) {
           species: spv, symptom: SERVICE2SYMPTOM[svcCode] || 'other',
           service_code: svcCode, description: el('ds').value, pashu_tag: tag,
           emergency: el('em').checked ? 1 : 0,
+          client_req_id: reqId,
           farm_lat: farmPos.lat, farm_lng: farmPos.lng,
           photo_b64: b64 || '', photo_mime: 'image/jpeg'
         };
@@ -1456,19 +1479,19 @@ function vTicket(ticket) {
             esc(String(r.farmer.phone).replace(/\D/g, '')) + '">' + icon('video') + ' WhatsApp video call</a>' +
             '<a class="btn small" href="tel:' + esc(r.farmer.phone) + '">' + icon('phone') + ' Call user</a></div>' +
             '<p class="hint">WhatsApp opens on their chat — tap the video-call icon at the top to ring them. Their phone rings like any WhatsApp call, even locked.</p>' +
-            '<label>Observation &amp; diagnosis <span class="en">(required to resolve)</span></label>' +
+            '<label for="note">Observation &amp; diagnosis <span class="en">(required to resolve)</span></label>' +
             '<textarea id="note" maxlength="1000" placeholder="Findings · diagnosis · advice to the user"></textarea>' +
             '<div class="rowline2"><div><label>Weight (kg)</label><input id="wkg" type="number" inputmode="decimal" min="0" max="2000" placeholder="410"></div>' +
             '<div><label>Temp (&deg;C)</label><input id="tpc" type="number" inputmode="decimal" min="30" max="45" step="0.1" placeholder="39.8"></div></div>' +
             '<label>Medicines &mdash; Rx</label>' +
             '<div id="meds"></div>' +
             '<div class="rowline"><button class="btn small ghost" id="addmed" type="button">+ Add medicine</button></div>' +
-            '<label>Advice to the owner <span class="en">(printed on the slip)</span></label>' +
+            '<label for="adv">Advice to the owner <span class="en">(printed on the slip)</span></label>' +
             '<textarea id="adv" maxlength="600" placeholder="Strip the quarter fully before each dose. Keep bedding dry."></textarea>' +
-            '<label>Tests <span class="en">(optional)</span></label>' +
+            '<label for="tst">Tests <span class="en">(optional)</span></label>' +
             '<textarea id="tst" maxlength="1000" placeholder="Blood smear · milk culture · revisit if ..."></textarea>' +
             '<label>Follow-up date <span class="en">(optional)</span></label><input id="fud" type="date">' +
-            '<label>Prescription photo (optional)</label>' +
+            '<label for="rxf">Prescription photo (optional)</label>' +
             '<input id="rxf" type="file" accept="image/*" capture="environment">' +
             '<p class="hint">Medicines, advice or tests are issued as a formal prescription with your name, registration number, centre and time.</p>' +
             '<div class="rowline"><button class="btn small ghost" data-a="log_call">Log call</button></div>' +
@@ -1508,7 +1531,7 @@ function vTicket(ticket) {
         toast(T('అభ్యర్థన రద్దు అయ్యింది', 'Request withdrawn'));
         vTicket(ticket);
       })
-        .catch(function (e) { el('wd').disabled = false; alert(e.message); });
+        .catch(function (e) { el('wd').disabled = false; showErr(e); });
     };
     if (staff && el('acts')) {
       var onThisTicket = function () { return location.hash === '#t/' + ticket; };
@@ -1522,7 +1545,7 @@ function vTicket(ticket) {
       };
       if (el('claim')) el('claim').onclick = function () {
         api('vet.claim', { id: r.id }).then(function () { if (onThisTicket()) vTicket(ticket); })
-          .catch(function (e) { alert(e.message); if (onThisTicket()) vTicket(ticket); });
+          .catch(function (e) { showErr(e); if (onThisTicket()) vTicket(ticket); });
       };
       Array.prototype.forEach.call(document.querySelectorAll('#acts [data-a]'), function (b) {
         b.onclick = function () {
@@ -1542,7 +1565,7 @@ function vTicket(ticket) {
             unbusy();
             toast('Saved');
             if (onThisTicket()) vTicket(ticket);
-          }).catch(function (e) { unbusy(); alert(e.message); });
+          }).catch(function (e) { unbusy(); showErr(e); });
         };
       });
     }
@@ -1737,11 +1760,11 @@ function vLoc(mode) {
             esc(T('\u0c32\u0c4a\u0c15\u0c47\u0c37\u0c28\u0c4d \u0c05\u0c28\u0c41\u0c2e\u0c24\u0c3f\u0c02\u0c1a\u0c02\u0c21\u0c3f', 'Allow location')) + '</button>' +
           '<div id="locout" style="margin-top:11px"></div></div>'
       : '<div class="card">' +
-          '<label style="margin-top:0">' + TL('\u0c2e\u0c02\u0c21\u0c32\u0c02', 'Mandal') + '</label>' +
+          '<label for="lmd" style="margin-top:0">' + TL('\u0c2e\u0c02\u0c21\u0c32\u0c02', 'Mandal') + '</label>' +
           '<select id="lmd">' + mOpts + '</select>' +
-          '<label>' + TL('\u0c17\u0c4d\u0c30\u0c3e\u0c2e \u0c2a\u0c02\u0c1a\u0c3e\u0c2f\u0c24\u0c40', 'Gram Panchayat') + '</label>' +
+          '<label for="lgp">' + TL('\u0c17\u0c4d\u0c30\u0c3e\u0c2e \u0c2a\u0c02\u0c1a\u0c3e\u0c2f\u0c24\u0c40', 'Gram Panchayat') + '</label>' +
           '<select id="lgp"><option value="">\u2014</option></select>' +
-          '<label>' + TL('\u0c17\u0c4d\u0c30\u0c3e\u0c2e\u0c02 / \u0c28\u0c3f\u0c35\u0c3e\u0c38\u0c02', 'Village / habitation') + '</label>' +
+          '<label for="lvg">' + TL('\u0c17\u0c4d\u0c30\u0c3e\u0c2e\u0c02 / \u0c28\u0c3f\u0c35\u0c3e\u0c38\u0c02', 'Village / habitation') + '</label>' +
           '<input id="lvg" maxlength="80" value="' + esc(cur.village || '') + '">' +
           '<div style="height:13px"></div>' +
           '<button class="btn" id="lsave">' + esc(T('\u0c38\u0c47\u0c35\u0c4d \u0c1a\u0c47\u0c2f\u0c02\u0c21\u0c3f', 'Save')) + '</button></div>';
@@ -2050,7 +2073,7 @@ function vAttend() {
           if (!box) return;
           box.innerHTML =
             '<img class="ph" style="max-width:140px" src="data:' + esc(d2.photo.mime) + ';base64,' + esc(d2.photo.b64) + '">';
-        }).catch(function (e) { alert(e.message); });
+        }).catch(function (e) { showErr(e); });
       };
     });
   }).catch(staffErr);
@@ -2092,7 +2115,7 @@ function vLeave() {
     Array.prototype.forEach.call(document.querySelectorAll('[data-lv]'), function (b) {
       b.onclick = function () {
         api('admin.leaveDecide', { id: b.getAttribute('data-lv'), decision: b.getAttribute('data-d') })
-          .then(vLeave).catch(function (e) { alert(e.message); });
+          .then(vLeave).catch(function (e) { showErr(e); });
       };
     });
   }).catch(staffErr);
@@ -2131,7 +2154,7 @@ function vStock() {
       el('fc').onchange = function () { localStorage.setItem('jps_stock_fc', el('fc').value); vStock(); };
       function save(code, qty, ro) {
         api('stock.upsert', { facility_code: el('fc').value, item_code: code, qty: qty, reorder_level: ro })
-          .then(vStock).catch(function (e) { alert(e.message); });
+          .then(vStock).catch(showErr);
       }
       Array.prototype.forEach.call(document.querySelectorAll('[data-save]'), function (b) {
         var c = b.getAttribute('data-save');
@@ -2171,7 +2194,7 @@ function vIssues() {
       var id = b.getAttribute('data-close');
       b.onclick = function () {
         api('admin.issueClose', { id: id, response: (el('ir-' + id) || {}).value || '' })
-          .then(vIssues).catch(function (e) { alert(e.message); });
+          .then(vIssues).catch(function (e) { showErr(e); });
       };
     });
   }).catch(staffErr);
@@ -2200,15 +2223,22 @@ function vBcast() {
     Array.prototype.forEach.call(document.querySelectorAll('[data-end]'), function (b) {
       b.onclick = function () {
         api('admin.broadcastEnd', { id: b.getAttribute('data-end') }).then(vBcast)
-          .catch(function (e) { alert(e.message); });
+          .catch(function (e) { showErr(e); });
       };
     });
   }).catch(staffErr);
 }
 
+/* Staff sign in with their mobile number and a PIN they chose themselves.
+ * The one-time access code is spent once, at enrolment, and never again: it is the
+ * only thing proving the person owns that number, because every staff mobile is in
+ * the district master. msg carries what was typed back through a refusal, so one
+ * wrong digit does not cost the whole form. */
 function vStaff(msg) {
   stopPoll();
   var nb = S.meta && S.meta.needsBootstrap;
+  var keep = msg || {};
+  var enrolOpen = !!keep.enrol;
   render(
     '<div class="signin">' +
       '<div class="si-mark"><img src="img/emblem-telangana.png" width="58" height="58" alt="">' +
@@ -2217,50 +2247,110 @@ function vStaff(msg) {
       '<h1>Staff sign-in</h1>' +
       '<p class="si-sub">Veterinary &amp; Animal Husbandry Dept, Jangaon</p>' +
     '</div>' +
-    (msg ? '<div class="' + (msg.ok ? 'ok' : 'err') + '">' + esc(msg.text) + '</div>' : '') +
-    '<div class="card">' +
-      '<label style="margin-top:0">Email</label>' +
-      '<input id="se" type="email" value="' +
-        esc((msg && msg.se) || localStorage.getItem('jps_staff_email') || '') + '">' +
-      '<label>Access code</label>' +
-      '<input id="sc" type="text" autocapitalize="characters" placeholder="10 characters"' +
-        ((msg && msg.sc) ? ' value="' + esc(msg.sc) + '"' : '') + '>' +
+    (msg && msg.text ? '<div class="' + (msg.ok ? 'ok' : 'err') + '">' + esc(msg.text) + '</div>' : '') +
+
+    '<div class="card"' + (enrolOpen ? ' hidden' : '') + ' id="loginbox">' +
+      '<label style="margin-top:0">Mobile number</label>' +
+      '<input id="sph" type="tel" inputmode="numeric" maxlength="10" autocomplete="username" ' +
+        'placeholder="10-digit mobile" value="' + esc(keep.sph || localStorage.getItem('jps_staff_phone') || '') + '">' +
+      '<label>PIN</label>' +
+      '<input id="spin" type="password" inputmode="numeric" maxlength="6" autocomplete="current-password" ' +
+        'placeholder="6-digit PIN"' + (keep.spin ? ' value="' + esc(keep.spin) + '"' : '') + '>' +
       '<div style="height:14px"></div>' +
-      '<button class="btn" id="cbtn">Sign in</button>' +
+      '<button class="btn" id="pbtn">Sign in</button>' +
+      '<p class="hint" style="text-align:center;margin-top:11px">' +
+        '<a href="#staff" id="toenrol">First time here, or forgot your PIN?</a></p>' +
       '<div class="orline"><span>or</span></div>' +
       '<button class="btn ghost" id="gbtn">Sign in with Google</button>' +
       '<p class="en" style="text-align:center;margin-top:9px">Google works once the district OAuth ' +
-        'client is configured. Until then use the access code.</p>' +
+        'client is configured. Until then use your mobile and PIN.</p>' +
     '</div>' +
+
+    '<div class="card"' + (enrolOpen ? '' : ' hidden') + ' id="enrolbox">' +
+      '<h2>' + icon('person') + ' Set your PIN</h2>' +
+      '<p class="hint">Use the one-time access code from the DV&amp;AHO office. ' +
+        'You choose the PIN yourself and will not need the code again.</p>' +
+      '<label>Mobile number</label>' +
+      '<input id="eph" type="tel" inputmode="numeric" maxlength="10" ' +
+        'placeholder="10-digit mobile" value="' + esc(keep.eph || '') + '">' +
+      '<label>One-time access code</label>' +
+      '<input id="ecode" type="text" autocapitalize="characters" maxlength="10" ' +
+        'placeholder="10 characters"' + (keep.ecode ? ' value="' + esc(keep.ecode) + '"' : '') + '>' +
+      '<label>Choose a 6-digit PIN</label>' +
+      '<input id="epin" type="password" inputmode="numeric" maxlength="6" placeholder="6 digits">' +
+      '<label>Confirm the PIN</label>' +
+      '<input id="epin2" type="password" inputmode="numeric" maxlength="6" placeholder="6 digits again">' +
+      '<p class="hint">Not six of the same digit, and not a run like 123456.</p>' +
+      '<div style="height:13px"></div>' +
+      '<button class="btn" id="ebtn">Set PIN and sign in</button>' +
+      '<p class="hint" style="text-align:center;margin-top:11px">' +
+        '<a href="#staff" id="tologin">Back to sign-in</a></p>' +
+    '</div>' +
+
     (nb ? '<div class="card"><h2>First-time setup</h2>' +
-      '<label>Your email</label><input id="be" type="email" value="' + esc((msg && msg.be) || '') + '">' +
-      '<label>Your name</label><input id="bn" type="text" value="' + esc((msg && msg.bn) || '') + '">' +
+      '<label>Your email</label><input id="be" type="email" value="' + esc(keep.be || '') + '">' +
+      '<label>Your name</label><input id="bn" type="text" value="' + esc(keep.bn || '') + '">' +
       '<label>Bootstrap code (from the setup() log)</label>' +
-      '<input id="bc" type="text" autocapitalize="characters" value="' + esc((msg && msg.bc) || '') + '">' +
+      '<input id="bc" type="text" autocapitalize="characters" value="' + esc(keep.bc || '') + '">' +
       '<div style="height:13px"></div><button class="btn" id="bbtn">Create admin</button></div>' : '') +
     '<p class="hint" style="text-align:center"><a href="#identify">← User app</a></p>');
-  el('gbtn').onclick = function () {
-    el('gbtn').classList.add('busy');
-    tryGoogleSignIn().then(function (idt) {
-      el('gbtn').classList.remove('busy');
-      if (!idt) return vStaff({ ok: false, text: 'Google sign-in unavailable on this build — use the access code.' });
-      api('staff.google', { id_token: idt })
-        .then(function (d) { saveAuth(d.token, d.user); location.hash = d.user.role === 'admin' ? '#admin' : '#vet'; })
-        .catch(function (e) { vStaff({ ok: false, text: e.message }); });
-    });
+
+  var swap = function (toEnrol) {
+    el('loginbox').hidden = toEnrol;
+    el('enrolbox').hidden = !toEnrol;
+    var first = el(toEnrol ? 'eph' : 'sph');
+    if (first) first.focus();
   };
-  el('cbtn').onclick = function () {
-    busy(el('cbtn'), api('staff.code', { email: el('se').value, code: el('sc').value }))
+  el('toenrol').onclick = function (ev) { ev.preventDefault(); swap(true); };
+  el('tologin').onclick = function (ev) { ev.preventDefault(); swap(false); };
+
+  var landed = function (d) {
+    try { localStorage.setItem('jps_staff_phone', el('sph') ? el('sph').value : ''); } catch (e) {}
+    saveAuth(d.token, d.user);
+    location.hash = d.user.role === 'admin' ? '#admin' : '#vet';
+  };
+
+  el('pbtn').onclick = function () {
+    busy(el('pbtn'), api('staff.pinLogin', { phone: el('sph').value, pin: el('spin').value }))
+      .then(landed)
+      .catch(function (e) {
+        vStaff({ ok: false, text: e.message, sph: el('sph').value,
+                 enrol: e.code === 'pin_not_set', eph: el('sph').value });
+        var f = el('spin') || el('ecode');
+        if (f) f.focus();
+      });
+  };
+
+  el('ebtn').onclick = function () {
+    var pin = el('epin').value, pin2 = el('epin2').value;
+    if (pin !== pin2) {
+      return vStaff({ ok: false, text: 'The two PINs do not match', enrol: true,
+                      eph: el('eph').value, ecode: el('ecode').value });
+    }
+    busy(el('ebtn'), api('staff.pinSet',
+      { phone: el('eph').value, code: el('ecode').value, pin: pin }))
       .then(function (d) {
-        localStorage.setItem('jps_staff_email', el('se').value);
+        try { localStorage.setItem('jps_staff_phone', el('eph').value); } catch (er) {}
         saveAuth(d.token, d.user);
         location.hash = d.user.role === 'admin' ? '#admin' : '#vet';
       })
       .catch(function (e) {
-        vStaff({ ok: false, text: e.message, se: el('se').value, sc: el('sc').value });
-        if (el('sc')) el('sc').focus();
+        vStaff({ ok: false, text: e.message, enrol: true,
+                 eph: el('eph').value, ecode: el('ecode').value });
       });
   };
+
+  el('gbtn').onclick = function () {
+    el('gbtn').classList.add('busy');
+    tryGoogleSignIn().then(function (idt) {
+      el('gbtn').classList.remove('busy');
+      if (!idt) return vStaff({ ok: false, text: 'Google sign-in unavailable on this build — use your mobile and PIN.' });
+      api('staff.google', { id_token: idt })
+        .then(landed)
+        .catch(function (e) { vStaff({ ok: false, text: e.message }); });
+    });
+  };
+
   if (nb) el('bbtn').onclick = function () {
     busy(el('bbtn'), api('staff.bootstrap',
       { email: el('be').value, name: el('bn').value, code: el('bc').value }))
@@ -2329,11 +2419,11 @@ function vVet(tab) {
         S.user.reg_no = d.reg_no;
         localStorage.setItem('jps_user', JSON.stringify(S.user));
         vVet(tab);
-      }).catch(function (e) { el('regsave').disabled = false; alert(e.message); });
+      }).catch(function (e) { el('regsave').disabled = false; showErr(e); });
     };
     el('avbtn').onclick = function () {
       api('staff.availability', { on: q.on_call ? 0 : 1 }).then(function () { vVet(tab); })
-        .catch(function (e) { alert(e.message); });
+        .catch(function (e) { showErr(e); });
     };
     Array.prototype.forEach.call(document.querySelectorAll('[data-t]'), function (b) {
       b.onclick = function () { vVet(b.getAttribute('data-t')); };
@@ -2345,7 +2435,7 @@ function vVet(tab) {
             // don't repaint the console if the doctor already navigated elsewhere
             if (location.hash === '' || location.hash === '#vet') vVet('mine');
           })
-          .catch(function (e) { alert(e.message); if (location.hash === '' || location.hash === '#vet') vVet(tab); });
+          .catch(function (e) { showErr(e); if (location.hash === '' || location.hash === '#vet') vVet(tab); });
       };
     });
     el('lo').onclick = function (ev) { ev.preventDefault(); logout(); };
